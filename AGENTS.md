@@ -43,17 +43,17 @@ Pipeline steps (in order): `prompt → tokenize → embeddings → transformer �
 
 ### Components (all vanilla TS, return `HTMLElement`)
 
-| File | Role |
-|---|---|
-| `src/app.ts` | Shell grid (header / main / footer), mounts all components |
-| `src/components/Timeline.ts` | Top "metro line" navigator |
-| `src/components/Controls.ts` | Play/pause/prev/next buttons |
-| `src/components/StepPanel.ts` | Left panel: step title, idea, detail |
-| `src/components/stepRenderers.ts` | Per-step content renderers (one per `StepId`) |
-| `src/components/SchematicPanel.ts` | Right SVG schematic (BOXES + CONTAINERS data-driven) |
-| `src/dom.ts` | `h()` and `svgEl()` helpers, `clear()` |
-| `src/animation.ts` | `animateIn()`, `animateTitle()` using Motion |
-| `src/engine.ts` | `softmaxWithTemperature()`, `formatProbability()` |
+| File                               | Role                                                       |
+| ---------------------------------- | ---------------------------------------------------------- |
+| `src/app.ts`                       | Shell grid (header / main / footer), mounts all components |
+| `src/components/Timeline.ts`       | Top "metro line" navigator                                 |
+| `src/components/Controls.ts`       | Play/pause/prev/next buttons                               |
+| `src/components/StepPanel.ts`      | Left panel: step title, idea, detail                       |
+| `src/components/stepRenderers.ts`  | Per-step content renderers (one per `StepId`)              |
+| `src/components/SchematicPanel.ts` | Right SVG schematic (BOXES + CONTAINERS data-driven)       |
+| `src/dom.ts`                       | `h()` and `svgEl()` helpers, `clear()`                     |
+| `src/animation.ts`                 | `animateIn()`, `animateTitle()` using Motion               |
+| `src/engine.ts`                    | `softmaxWithTemperature()`, `formatProbability()`          |
 
 ### Computed values (derived from store state on demand)
 
