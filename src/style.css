@@ -19,6 +19,19 @@ body {
   margin: 0;
 }
 
+/* Tailwind v4 : rétablir le curseur pointer sur les éléments cliquables. */
+button:not(:disabled),
+a[href],
+[role="button"],
+label[for],
+summary {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
 body {
   font-family:
     system-ui,

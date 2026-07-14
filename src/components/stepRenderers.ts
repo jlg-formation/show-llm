@@ -94,35 +94,39 @@ function renderTokenize(state: AppState): HTMLElement {
 }
 
 function renderEmbeddings(state: AppState): HTMLElement {
-  const rows = state.embeddings.map((emb) =>
-    h("div", { class: "anim-item flex items-center gap-3" }, [
+  const rows = state.embeddings.map((emb) => {
+    const token = state.tokens.find((t) => t.text === emb.tokenText);
+    return h("div", { class: "anim-item flex items-center gap-2" }, [
       h(
         "span",
         {
           class:
-            "w-16 shrink-0 text-right font-mono text-sm text-[var(--color-ink)]"
+            "w-12 shrink-0 text-right font-mono text-sm text-[var(--color-ink)]"
         },
         [emb.tokenText.trim() || "␣"]
       ),
       h(
-        "div",
-        { class: "flex gap-1" },
-        emb.values.map((v) => {
-          const cell = h("span", {
-            class: "block h-6 w-6 rounded",
-            title: v.toFixed(2)
-          });
-          // Bleu = positif, orange = négatif ; intensité = amplitude.
-          const alpha = Math.min(Math.abs(v), 1);
-          cell.style.background =
-            v >= 0
-              ? `rgba(37,99,235,${0.15 + alpha * 0.75})`
-              : `rgba(245,158,11,${0.15 + alpha * 0.75})`;
-          return cell;
-        })
-      )
-    ])
-  );
+        "span",
+        {
+          class:
+            "w-16 shrink-0 text-right font-mono text-xs text-[var(--color-muted)]"
+        },
+        [token ? `#${token.id}` : ""]
+      ),
+      h("span", { class: "text-[var(--color-muted)]" }, ["→"]),
+      h("div", { class: "flex items-center gap-1 font-mono text-sm" }, [
+        h("span", { class: "text-[var(--color-muted)]" }, ["["]),
+        ...emb.values.map((v, i) =>
+          h("span", { class: "tabular-nums text-[var(--color-ink)]" }, [
+            `${v >= 0 ? " " : ""}${v.toFixed(2)}${
+              i < emb.values.length - 1 ? "," : ""
+            }`
+          ])
+        ),
+        h("span", { class: "text-[var(--color-muted)]" }, ["]"])
+      ])
+    ]);
+  });
   return wrap([
     card([
       h("p", { class: "mb-3 text-sm text-[var(--color-muted)]" }, [

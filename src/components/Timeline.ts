@@ -39,7 +39,7 @@ export function createTimeline(): HTMLElement {
   // Trait reliant les stations (derrière les pastilles).
   const line = h("div", {
     class:
-      "absolute top-[14px] left-8 right-8 h-0.5 bg-[var(--color-border)] z-0"
+      "absolute top-[19px] left-8 right-8 h-0.5 bg-[var(--color-border)] z-0"
   });
 
   const track = h(
