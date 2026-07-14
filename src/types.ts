@@ -7,9 +7,9 @@ export type StepId =
   | "embeddings"
   | "transformer"
   | "logits"
-  | "temperature"
-  | "topk-topp"
+  | "topk"
   | "softmax"
+  | "topp"
   | "probabilities"
   | "sampling"
   | "append-token"
@@ -38,7 +38,8 @@ export type SchematicNodeId =
   | "logits"
   | "engine"
   | "probabilities"
-  | "output";
+  | "output"
+  | "end";
 
 /** Un token issu de la tokenisation. */
 export interface Token {

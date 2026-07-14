@@ -41,59 +41,59 @@ export const STEPS: StepMeta[] = [
     schematicNode: "logits"
   },
   {
-    id: "temperature",
-    label: "Température",
-    title: "6a. Moteur d'inférence : température",
-    idea: "Le moteur d'inférence applique la température pour accentuer ou lisser les écarts entre logits.",
-    schematicNode: "engine"
-  },
-  {
-    id: "topk-topp",
-    label: "Top-k / Top-p",
-    title: "6b. Moteur d'inférence : filtres",
-    idea: "Des filtres (top-k, top-p…) restreignent les candidats retenus.",
+    id: "topk",
+    label: "Top-k",
+    title: "6a. Moteur d'inférence : Top-k (sur les logits)",
+    idea: "On classe les logits et on ne garde que les k tokens ayant les scores les plus élevés. Tout le reste est écarté.",
     schematicNode: "engine"
   },
   {
     id: "softmax",
     label: "Softmax",
-    title: "6c. Moteur d'inférence : Softmax",
-    idea: "Un unique Softmax transforme les logits filtrés en probabilités qui somment à 1.",
+    title: "6b. Moteur d'inférence : Softmax (avec température)",
+    idea: "Sur les candidats restants, la température ajuste les écarts puis un unique Softmax les transforme en probabilités.",
+    schematicNode: "engine"
+  },
+  {
+    id: "topp",
+    label: "Top-p",
+    title: "6c. Moteur d'inférence : Top-p (+ renormalisation)",
+    idea: "On garde juste assez de tokens pour cumuler p % de la masse, puis on renormalise leurs probabilités.",
     schematicNode: "engine"
   },
   {
     id: "probabilities",
     label: "Probabilités",
-    title: "7. Visualisation des probabilités",
+    title: "6d. Moteur d'inférence : probabilités finales",
     idea: "Les tokens cohérents ont une forte probabilité ; les surprenants (forte perplexité) une probabilité minuscule.",
-    schematicNode: "probabilities"
+    schematicNode: "engine"
   },
   {
     id: "sampling",
     label: "Choix",
-    title: "8. Choix du prochain token",
+    title: "7. Choix du prochain token",
     idea: "Le moteur échantillonne un token — pas forcément le plus probable.",
-    schematicNode: "engine"
+    schematicNode: "probabilities"
   },
   {
     id: "append-token",
     label: "Nouveau prompt",
-    title: "9. Construction de la nouvelle phrase",
+    title: "8. Construction de la nouvelle phrase",
     idea: "Le token choisi est ajouté au prompt, qui grandit d'un token.",
     schematicNode: "output"
   },
   {
     id: "loop",
     label: "Boucle",
-    title: "10. Boucle d'inférence",
+    title: "9. Boucle d'inférence",
     idea: "Le cycle recommence avec le nouveau prompt, token après token.",
     schematicNode: "prompt"
   },
   {
     id: "eos",
     label: "Fin",
-    title: "11. Fin de génération",
+    title: "10. Fin de génération",
     idea: "La génération s'arrête sur un token de fin (EOS) ou une autre condition d'arrêt.",
-    schematicNode: "output"
+    schematicNode: "end"
   }
 ];

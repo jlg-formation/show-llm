@@ -1,6 +1,6 @@
-import { h } from "../dom";
+import { h, svgEl } from "../dom";
 import type { AppState, StepId } from "../types";
-import { computedCandidates } from "../store";
+import { computedCandidates, computedFinalCandidates } from "../store";
 import { formatProbability } from "../engine";
 
 /**
@@ -19,12 +19,12 @@ export function renderStepContent(step: StepId, state: AppState): HTMLElement {
       return renderTransformer();
     case "logits":
       return renderLogits(state);
-    case "temperature":
-      return renderTemperature(state);
-    case "topk-topp":
-      return renderTopKP(state);
+    case "topk":
+      return renderTopK(state);
     case "softmax":
-      return renderSoftmax();
+      return renderSoftmax(state);
+    case "topp":
+      return renderTopP(state);
     case "probabilities":
       return renderProbabilities();
     case "sampling":
@@ -116,12 +116,19 @@ function renderEmbeddings(state: AppState): HTMLElement {
       h("span", { class: "text-[var(--color-muted)]" }, ["→"]),
       h("div", { class: "flex items-center gap-1 font-mono text-sm" }, [
         h("span", { class: "text-[var(--color-muted)]" }, ["["]),
-        ...emb.values.map((v, i) =>
+        ...emb.values.map((v) =>
           h("span", { class: "tabular-nums text-[var(--color-ink)]" }, [
-            `${v >= 0 ? " " : ""}${v.toFixed(2)}${
-              i < emb.values.length - 1 ? "," : ""
-            }`
+            `${v >= 0 ? " " : ""}${v.toFixed(2)},`
           ])
+        ),
+        h(
+          "span",
+          {
+            class: "text-[var(--color-muted)]",
+            title:
+              "Les vrais embeddings ont des centaines/milliers de dimensions"
+          },
+          ["…"]
         ),
         h("span", { class: "text-[var(--color-muted)]" }, ["]"])
       ])
@@ -138,23 +145,59 @@ function renderEmbeddings(state: AppState): HTMLElement {
 }
 
 function renderTransformer(): HTMLElement {
-  const layers = Array.from({ length: 4 }, (_, i) =>
+  const layerBox = (label: string) =>
     h(
       "div",
       {
         class:
           "anim-item rounded-md border border-slate-500 bg-slate-800 px-4 py-2 text-center text-sm font-medium text-slate-100"
       },
-      [`Couche ${i + 1}`]
-    )
+      [label]
+    );
+  const ellipsis = h(
+    "div",
+    {
+      class:
+        "anim-item text-center text-2xl font-bold leading-none text-slate-400",
+      title: "De nombreuses couches identiques s'enchaînent (des dizaines)"
+    },
+    ["⋮"]
   );
+  const layers = [
+    layerBox("Couche 1"),
+    layerBox("Couche 2"),
+    ellipsis,
+    layerBox("Couche N")
+  ];
   return wrap([
     card(
       [
         h("p", { class: "mb-3 text-sm text-slate-300" }, [
           "Les embeddings traversent le Transformer — une boîte noire à plusieurs couches. On ne montre pas l'intérieur (attention, feed-forward…)."
         ]),
-        h("div", { class: "flex flex-col gap-2" }, layers)
+        h("div", { class: "flex flex-col gap-2" }, layers),
+        h("p", { class: "mt-4 mb-1 text-xs font-semibold text-slate-400" }, [
+          "Nombre de couches sur quelques LLM open weight :"
+        ]),
+        h(
+          "ul",
+          { class: "flex flex-col gap-0.5 text-xs text-slate-300" },
+          [
+            ["gpt-oss-20b", "24 couches"],
+            ["gpt-oss-120b", "36 couches"],
+            ["Llama 3.1 8B", "32 couches"],
+            ["Llama 3.1 70B", "80 couches"],
+            ["Qwen2.5 72B", "80 couches"],
+            ["Mistral 7B", "32 couches"],
+            ["DeepSeek-V3 671B", "61 couches"]
+          ].map(([name, count]) =>
+            h("li", { class: "flex items-baseline gap-2" }, [
+              h("span", { class: "font-mono text-slate-100" }, [name]),
+              h("span", { class: "text-slate-400" }, ["→"]),
+              h("span", {}, [count])
+            ])
+          )
+        )
       ],
       "!bg-slate-900 !border-slate-700 text-slate-100"
     )
@@ -163,27 +206,47 @@ function renderTransformer(): HTMLElement {
 
 function renderLogits(state: AppState): HTMLElement {
   const maxAbs = Math.max(...state.candidates.map((c) => Math.abs(c.logit)));
-  const bars = state.candidates.map((c) =>
-    h("div", { class: "anim-item flex items-center gap-3" }, [
-      h("span", { class: "w-28 shrink-0 text-sm" }, [c.text]),
-      h("div", { class: "relative h-5 flex-1 rounded bg-slate-100" }, [
-        (() => {
-          const bar = h("div", {
-            class: "absolute top-0 h-5 rounded"
-          });
-          const w = (Math.abs(c.logit) / maxAbs) * 50;
-          bar.style.width = `${w}%`;
-          bar.style.left = c.logit >= 0 ? "50%" : `${50 - w}%`;
-          bar.style.background =
-            c.logit >= 0 ? "var(--color-accent)" : "var(--color-active)";
-          return bar;
-        })()
-      ]),
-      h("span", { class: "w-14 shrink-0 text-right font-mono text-sm" }, [
-        c.logit.toFixed(1)
+  const bars: HTMLElement[] = [];
+  state.candidates.forEach((c, i) => {
+    const prev = state.candidates[i - 1];
+    if (prev && prev.logit >= 0 && c.logit < 0) {
+      bars.push(
+        h(
+          "div",
+          {
+            class:
+              "anim-item flex items-center gap-3 text-2xl font-bold leading-none text-[var(--color-muted)]",
+            title: "Tous les autres tokens du vocabulaire sont aussi évalués"
+          },
+          [
+            h("span", { class: "w-28 shrink-0" }, [""]),
+            h("span", { class: "flex-1 text-center" }, ["⋯"])
+          ]
+        )
+      );
+    }
+    bars.push(
+      h("div", { class: "anim-item flex items-center gap-3" }, [
+        h("span", { class: "w-28 shrink-0 text-sm" }, [c.text]),
+        h("div", { class: "relative h-5 flex-1 rounded bg-slate-100" }, [
+          (() => {
+            const bar = h("div", {
+              class: "absolute top-0 h-5 rounded"
+            });
+            const w = (Math.abs(c.logit) / maxAbs) * 50;
+            bar.style.width = `${w}%`;
+            bar.style.left = c.logit >= 0 ? "50%" : `${50 - w}%`;
+            bar.style.background =
+              c.logit >= 0 ? "var(--color-accent)" : "var(--color-active)";
+            return bar;
+          })()
+        ]),
+        h("span", { class: "w-14 shrink-0 text-right font-mono text-sm" }, [
+          c.logit.toFixed(1)
+        ])
       ])
-    ])
-  );
+    );
+  });
   return wrap([
     card([
       h("p", { class: "mb-1 text-sm text-[var(--color-muted)]" }, [
@@ -200,64 +263,400 @@ function renderLogits(state: AppState): HTMLElement {
   ]);
 }
 
-function renderTemperature(state: AppState): HTMLElement {
+function renderTopK(state: AppState): HTMLElement {
+  const topK = state.params.topK;
+  // Sur cette démo pédagogique, on montre les quelques tokens visibles,
+  // triés par logit décroissant (top-k s'applique AVANT le softmax).
+  const sorted = [...state.candidates].sort((a, b) => b.logit - a.logit);
+  const maxLogit = Math.max(...sorted.map((c) => Math.abs(c.logit)));
+
+  const rows = sorted.map((c, i) => {
+    const kept = i < topK;
+    return h(
+      "div",
+      {
+        class: `anim-item flex items-center gap-3 ${kept ? "" : "opacity-40"}`
+      },
+      [
+        h("span", { class: "w-6 shrink-0 text-center text-sm" }, [
+          kept ? "✓" : "✕"
+        ]),
+        h("span", { class: "w-24 shrink-0 text-sm" }, [c.text]),
+        h("div", { class: "relative h-4 flex-1 rounded bg-slate-100" }, [
+          (() => {
+            const bar = h("div", { class: "absolute top-0 h-4 rounded" });
+            bar.style.width = `${(Math.abs(c.logit) / maxLogit) * 100}%`;
+            bar.style.left = "0";
+            bar.style.background = kept
+              ? "var(--color-accent)"
+              : "var(--color-muted)";
+            return bar;
+          })()
+        ]),
+        h("span", { class: "w-12 shrink-0 text-right font-mono text-xs" }, [
+          c.logit.toFixed(1)
+        ])
+      ]
+    );
+  });
+
+  return wrap([
+    card([
+      h("div", { class: "anim-item mb-2 flex items-center gap-2" }, [
+        h(
+          "span",
+          {
+            class:
+              "rounded bg-[var(--color-accent-soft)] px-2 py-0.5 font-mono text-sm font-semibold text-[var(--color-accent)]"
+          },
+          [`top-k = ${topK}`]
+        ),
+        h("span", { class: "text-sm font-medium text-[var(--color-ink)]" }, [
+          "garder les k tokens aux logits les plus élevés"
+        ])
+      ]),
+      h("p", { class: "anim-item mb-4 text-sm text-[var(--color-muted)]" }, [
+        "Premier filtre du moteur, appliqué directement sur les logits (avant tout calcul de probabilité). On classe tout le vocabulaire par score décroissant et on ne conserve que les k premiers ; tout le reste est écarté d'un coup."
+      ]),
+      // Entonnoir visuel : vocabulaire -> k
+      h(
+        "div",
+        { class: "anim-item mb-4 flex items-center justify-center gap-3" },
+        [
+          h(
+            "div",
+            {
+              class:
+                "flex h-14 flex-col items-center justify-center rounded-lg bg-slate-100 px-4"
+            },
+            [
+              h(
+                "span",
+                {
+                  class: "font-mono text-base font-bold text-[var(--color-ink)]"
+                },
+                [state.vocabSize.toLocaleString("fr-FR")]
+              ),
+              h("span", { class: "text-xs text-[var(--color-muted)]" }, [
+                "logits"
+              ])
+            ]
+          ),
+          h("span", { class: "text-2xl text-[var(--color-muted)]" }, ["⟶"]),
+          h(
+            "div",
+            {
+              class:
+                "flex h-14 flex-col items-center justify-center rounded-lg bg-[var(--color-accent-soft)] px-4"
+            },
+            [
+              h(
+                "span",
+                {
+                  class:
+                    "font-mono text-base font-bold text-[var(--color-accent)]"
+                },
+                [`${topK}`]
+              ),
+              h("span", { class: "text-xs text-[var(--color-muted)]" }, [
+                "candidats"
+              ])
+            ]
+          )
+        ]
+      ),
+      h("p", { class: "anim-item mb-2 text-xs text-[var(--color-muted)]" }, [
+        `Sur nos tokens d'exemple, tous survivent (moins de ${topK} candidats) :`
+      ]),
+      h("div", { class: "flex flex-col gap-2" }, rows)
+    ])
+  ]);
+}
+
+function renderTopP(state: AppState): HTMLElement {
+  const cands = computedCandidates();
+  const total = cands.reduce((acc, c) => acc + c.probability, 0) || 1;
+  const topP = state.params.topP;
+
+  // --- Répartition cumulée pour top-p ---
+  let cum = 0;
+  const segments = cands.map((c) => {
+    const frac = c.probability / total;
+    const startCum = cum;
+    cum += frac;
+    // On garde le token si la masse AVANT lui n'a pas encore atteint le seuil.
+    const keptByP = startCum < topP;
+    return { c, frac, startCum, keptByP };
+  });
+  const keptCount = segments.filter((s) => s.keptByP).length;
+  // Renormalisation : les probabilités des tokens gardés somment de nouveau à 1.
+  const keptMass =
+    segments.filter((s) => s.keptByP).reduce((acc, s) => acc + s.frac, 0) || 1;
+
+  // --- Donut SVG illustrant la masse de probabilité (top-p) ---
+  const R = 52;
+  const C = 2 * Math.PI * R;
+  const arcs = segments.map((s) => {
+    const arc = svgEl("circle", {
+      cx: 70,
+      cy: 70,
+      r: R,
+      fill: "none",
+      "stroke-width": 22,
+      stroke: s.keptByP ? "var(--color-accent)" : "#cbd5e1",
+      "stroke-dasharray": `${s.frac * C} ${C - s.frac * C}`,
+      "stroke-dashoffset": `${-s.startCum * C}`
+    });
+    (arc as SVGElement).style.transition = "stroke 0.3s";
+    return arc;
+  });
+  const pctText = svgEl("text", {
+    x: 70,
+    y: 64,
+    "text-anchor": "middle",
+    "font-size": 20,
+    "font-weight": "700",
+    fill: "var(--color-accent)"
+  });
+  pctText.textContent = `${Math.round(topP * 100)} %`;
+  const labelText = svgEl("text", {
+    x: 70,
+    y: 84,
+    "text-anchor": "middle",
+    "font-size": 11,
+    fill: "var(--color-muted)"
+  });
+  labelText.textContent = "top-p";
+  const donut = svgEl(
+    "svg",
+    { viewBox: "0 0 140 140", width: 180, height: 180 },
+    [
+      svgEl("circle", {
+        cx: 70,
+        cy: 70,
+        r: R,
+        fill: "none",
+        "stroke-width": 22,
+        stroke: "#eef2f7"
+      }),
+      ...arcs,
+      pctText,
+      labelText
+    ]
+  );
+  // Rotation pour démarrer en haut.
+  arcs.forEach((a) => {
+    a.setAttribute("transform", "rotate(-90 70 70)");
+  });
+  donut
+    .querySelectorAll("circle")
+    .forEach((c) => c.setAttribute("transform", "rotate(-90 70 70)"));
+
+  const header = h(
+    "div",
+    {
+      class:
+        "anim-item flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--color-muted)]"
+    },
+    [
+      h("span", { class: "inline-block h-3 w-3 shrink-0" }, []),
+      h("span", { class: "w-24 shrink-0" }, ["token"]),
+      h("span", { class: "w-16 shrink-0 text-right" }, ["prob."]),
+      h("span", { class: "w-16 shrink-0 text-right" }, ["cumul"]),
+      h("span", { class: "flex-1" }, ["résultat"])
+    ]
+  );
+
+  const legend = h("div", { class: "flex flex-col gap-1.5 text-sm" }, [
+    header,
+    ...segments.map((s) => {
+      const cumIncl = s.startCum + s.frac;
+      // Ligne qui fait franchir le seuil top-p (dernier token gardé).
+      const crosses = s.startCum < topP && cumIncl >= topP;
+      return h(
+        "div",
+        {
+          class: `anim-item flex items-center gap-2 ${
+            s.keptByP ? "" : "opacity-50"
+          }`
+        },
+        [
+          (() => {
+            const dot = h("span", {
+              class: "inline-block h-3 w-3 shrink-0 rounded-full"
+            });
+            dot.style.background = s.keptByP
+              ? "var(--color-accent)"
+              : "#cbd5e1";
+            return dot;
+          })(),
+          h("span", { class: "w-24 shrink-0" }, [s.c.text]),
+          h("span", { class: "w-16 shrink-0 text-right font-mono text-xs" }, [
+            formatProbability(s.c.probability)
+          ]),
+          h(
+            "span",
+            {
+              class: `w-16 shrink-0 text-right font-mono text-xs ${
+                crosses
+                  ? "font-bold text-[var(--color-accent)]"
+                  : "text-[var(--color-muted)]"
+              }`
+            },
+            [`Σ ${Math.round(cumIncl * 100)} %`]
+          ),
+          h("span", { class: "flex-1 text-xs text-[var(--color-muted)]" }, [
+            s.keptByP ? `→ ${formatProbability(s.frac / keptMass)}` : "écarté"
+          ])
+        ]
+      );
+    })
+  ]);
+
+  return wrap([
+    card([
+      h("div", { class: "anim-item mb-2 flex items-center gap-2" }, [
+        h(
+          "span",
+          {
+            class:
+              "rounded bg-[var(--color-accent-soft)] px-2 py-0.5 font-mono text-sm font-semibold text-[var(--color-accent)]"
+          },
+          [`top-p = ${topP}`]
+        ),
+        h("span", { class: "text-sm font-medium text-[var(--color-ink)]" }, [
+          "garder juste assez de tokens pour cumuler p %"
+        ])
+      ]),
+      h("p", { class: "anim-item mb-3 text-sm text-[var(--color-muted)]" }, [
+        `Second filtre, appliqué cette fois sur les probabilités du Softmax. On ajoute les tokens du plus probable au moins probable jusqu'à atteindre ${Math.round(
+          topP * 100
+        )} % de la masse. Ici, ${keptCount} token${
+          keptCount > 1 ? "s" : ""
+        } suffisent, puis on renormalise (dernière colonne → nouvelle probabilité).`
+      ]),
+      h("div", { class: "anim-item flex flex-wrap items-center gap-6" }, [
+        donut,
+        h("div", { class: "min-w-[240px] flex-1" }, [legend])
+      ])
+    ])
+  ]);
+}
+
+function renderSoftmax(state: AppState): HTMLElement {
+  const cands = computedCandidates();
+  const maxProb = cands[0]?.probability ?? 1;
+  const bars: HTMLElement[] = [];
+  cands.forEach((c, i) => {
+    const prev = cands[i - 1];
+    if (prev && prev.logit >= 0 && c.logit < 0) {
+      bars.push(
+        h(
+          "div",
+          {
+            class:
+              "anim-item flex items-center gap-3 text-2xl font-bold leading-none text-[var(--color-muted)]",
+            title: "Tous les autres tokens du vocabulaire sont aussi évalués"
+          },
+          [
+            h("span", { class: "w-28 shrink-0" }, [""]),
+            h("span", { class: "flex-1 text-center" }, ["⋯"])
+          ]
+        )
+      );
+    }
+    bars.push(
+      h("div", { class: "anim-item flex items-center gap-3" }, [
+        h(
+          "span",
+          {
+            class: `w-28 shrink-0 text-sm ${
+              c.surprising ? "text-[var(--color-muted)] italic" : ""
+            }`
+          },
+          [c.text]
+        ),
+        h(
+          "span",
+          {
+            class:
+              "w-12 shrink-0 text-right font-mono text-xs text-[var(--color-muted)]"
+          },
+          [c.logit.toFixed(1)]
+        ),
+        h("span", { class: "text-[var(--color-muted)]" }, ["→"]),
+        h("div", { class: "h-5 flex-1 rounded bg-slate-100" }, [
+          (() => {
+            const bar = h("div", { class: "h-5 rounded" });
+            bar.style.width = `${Math.max((c.probability / maxProb) * 100, 1)}%`;
+            bar.style.background = c.surprising
+              ? "var(--color-muted)"
+              : "var(--color-accent)";
+            return bar;
+          })()
+        ]),
+        h("span", { class: "w-20 shrink-0 text-right font-mono text-sm" }, [
+          formatProbability(c.probability)
+        ])
+      ])
+    );
+  });
   return wrap([
     card([
       h("p", { class: "mb-3 text-sm text-[var(--color-muted)]" }, [
-        "Le moteur d'inférence divise chaque logit par la température T. Une température basse accentue les écarts (choix sûr), une température haute les lisse (plus de diversité)."
+        "Sur les candidats retenus par le top-k, le moteur divise chaque logit par la température T (une T basse accentue les écarts, une T haute les lisse), puis un unique Softmax transforme le tout en probabilités qui somment à 1. Formule générale :"
       ]),
-      h("div", { class: "anim-item flex items-baseline gap-2" }, [
+      h("div", { class: "anim-item mb-3 flex items-baseline gap-2" }, [
         h("span", { class: "text-sm text-[var(--color-muted)]" }, [
           "Température T ="
         ]),
-        h("span", { class: "text-3xl font-bold text-[var(--color-accent)]" }, [
-          state.params.temperature.toString()
+        h("span", { class: "text-2xl font-bold text-[var(--color-accent)]" }, [
+          state.params.temperature.toLocaleString("fr-FR")
         ])
-      ])
-    ])
-  ]);
-}
-
-function renderTopKP(state: AppState): HTMLElement {
-  return wrap([
-    card([
-      h("p", { class: "mb-3 text-sm text-[var(--color-muted)]" }, [
-        "Des filtres restreignent l'ensemble des candidats avant le tirage :"
       ]),
-      h("ul", { class: "flex flex-col gap-2 text-sm" }, [
-        h("li", { class: "anim-item" }, [
-          `top-k = ${state.params.topK} : on ne garde que les k tokens les plus probables.`
-        ]),
-        h("li", { class: "anim-item" }, [
-          `top-p = ${state.params.topP} : on garde les tokens jusqu'à cumuler ${Math.round(
-            state.params.topP * 100
-          )} % de la masse de probabilité.`
-        ])
-      ])
-    ])
-  ]);
-}
-
-function renderSoftmax(): HTMLElement {
-  return wrap([
-    card([
-      h("p", { class: "mb-3 text-sm text-[var(--color-muted)]" }, [
-        "Un unique Softmax transforme les logits filtrés en probabilités qui somment à 1 :"
+      (() => {
+        const box = h("div", {
+          class: "anim-item rounded-lg bg-slate-50 p-4 text-center"
+        });
+        box.innerHTML = `
+          <math display="block" style="font-size:1.25rem">
+            <msub><mi>p</mi><mi>i</mi></msub>
+            <mo>=</mo>
+            <mfrac>
+              <mrow>
+                <msup>
+                  <mi>e</mi>
+                  <mrow><msub><mi>logit</mi><mi>i</mi></msub><mo>/</mo><mi>T</mi></mrow>
+                </msup>
+              </mrow>
+              <mrow>
+                <munderover>
+                  <mo>&#x2211;</mo>
+                  <mrow><mi>j</mi><mo>=</mo><mn>1</mn></mrow>
+                  <mi>N</mi>
+                </munderover>
+                <msup>
+                  <mi>e</mi>
+                  <mrow><msub><mi>logit</mi><mi>j</mi></msub><mo>/</mo><mi>T</mi></mrow>
+                </msup>
+              </mrow>
+            </mfrac>
+          </math>`;
+        return box;
+      })(),
+      h("p", { class: "mb-2 mt-4 text-xs text-[var(--color-muted)]" }, [
+        `Appliqué à chaque logit (T = ${state.params.temperature.toLocaleString(
+          "fr-FR"
+        )}), on obtient la probabilité de chaque token :`
       ]),
-      h(
-        "div",
-        {
-          class:
-            "anim-item rounded-lg bg-slate-50 p-4 text-center font-mono text-sm"
-        },
-        ["p(i) = exp(logit(i) / T) / Σ exp(logit(j) / T)"]
-      )
+      h("div", { class: "flex flex-col gap-2" }, bars)
     ])
   ]);
 }
 
 function probabilityList(highlightChosen: string | null): HTMLElement {
-  const cands = computedCandidates();
+  // Résultat de l'étape 6c : tokens conservés (top-k + top-p) et renormalisés.
+  const cands = computedFinalCandidates();
   const max = cands[0]?.probability ?? 1;
   const rows = cands.map((c) =>
     h(
@@ -299,10 +698,13 @@ function probabilityList(highlightChosen: string | null): HTMLElement {
 }
 
 function renderProbabilities(): HTMLElement {
+  const kept = computedFinalCandidates().length;
   return wrap([
     card([
       h("p", { class: "mb-3 text-sm text-[var(--color-muted)]" }, [
-        "Les tokens cohérents ont une forte probabilité ; les tokens surprenants (forte perplexité) une probabilité minuscule — mais tout le vocabulaire est évalué."
+        `Voici la distribution finale issue de l'étape 6c : seuls les ${kept} token${
+          kept > 1 ? "s" : ""
+        } retenus par top-k puis top-p subsistent, avec leurs probabilités renormalisées (somme = 100 %). C'est sur cette distribution que se fera l'échantillonnage.`
       ]),
       probabilityList(null)
     ])
@@ -310,7 +712,7 @@ function renderProbabilities(): HTMLElement {
 }
 
 function renderSampling(state: AppState): HTMLElement {
-  const chosen = state.chosenToken ?? computedCandidates()[0]?.text ?? "";
+  const chosen = state.chosenToken ?? computedFinalCandidates()[0]?.text ?? "";
   return wrap([
     card([
       h("p", { class: "mb-3 text-sm text-[var(--color-muted)]" }, [
@@ -326,7 +728,7 @@ function renderSampling(state: AppState): HTMLElement {
 }
 
 function renderAppend(state: AppState): HTMLElement {
-  const chosen = state.chosenToken ?? computedCandidates()[0]?.text ?? "";
+  const chosen = state.chosenToken ?? computedFinalCandidates()[0]?.text ?? "";
   return wrap([
     card([
       h("p", { class: "mb-3 text-sm text-[var(--color-muted)]" }, [
@@ -342,7 +744,7 @@ function renderAppend(state: AppState): HTMLElement {
 }
 
 function renderLoop(state: AppState): HTMLElement {
-  const chosen = state.chosenToken ?? computedCandidates()[0]?.text ?? "";
+  const chosen = state.chosenToken ?? computedFinalCandidates()[0]?.text ?? "";
   return wrap([
     card([
       h("p", { class: "mb-3 text-sm text-[var(--color-muted)]" }, [
