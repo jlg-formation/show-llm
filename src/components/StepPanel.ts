@@ -1,5 +1,5 @@
 import { h, clear } from "../dom";
-import { STEPS } from "../scenario";
+import { stepsFor } from "../scenario";
 import { store } from "../store";
 import { renderStepContent } from "./stepRenderers";
 import { animateIn, animateTitle } from "../animation";
@@ -10,10 +10,10 @@ import { animateIn, animateTitle } from "../animation";
  */
 export function createStepPanel(): HTMLElement {
   const title = h("h2", {
-    class: "text-xl font-bold text-[var(--color-ink)]"
+    class: "text-xl font-bold text-[var(--color-ink)]",
   });
   const idea = h("p", {
-    class: "mt-1 text-sm text-[var(--color-muted)]"
+    class: "mt-1 text-sm text-[var(--color-muted)]",
   });
   const headerBlock = h("div", { class: "mb-5" }, [title, idea]);
 
@@ -23,16 +23,18 @@ export function createStepPanel(): HTMLElement {
     "section",
     {
       class:
-        "scroll-area flex h-full flex-col border-r border-[var(--color-border)] bg-[var(--color-bg)] px-8 py-6"
+        "scroll-area flex h-full flex-col border-r border-[var(--color-border)] bg-[var(--color-bg)] px-8 py-6",
     },
-    [headerBlock, content]
+    [headerBlock, content],
   );
 
   let lastIndex = -1;
+  let lastMode: string | null = null;
   store.subscribe((state) => {
-    if (state.stepIndex === lastIndex) return;
+    if (state.stepIndex === lastIndex && state.mode === lastMode) return;
     lastIndex = state.stepIndex;
-    const step = STEPS[state.stepIndex];
+    lastMode = state.mode;
+    const step = stepsFor(state.mode)[state.stepIndex];
 
     title.textContent = step.title;
     idea.textContent = step.idea;

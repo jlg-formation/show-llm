@@ -14,7 +14,15 @@ export type StepId =
   | "sampling"
   | "append-token"
   | "loop"
-  | "eos";
+  | "eos"
+  // Étapes propres au mode « Texte + image ».
+  | "patches"
+  | "vision-encoder"
+  | "image-tokens"
+  | "sequence";
+
+/** Mode d'entrée du LLM : texte seul ou texte + image. */
+export type Mode = "text" | "image";
 
 /** Métadonnées d'une étape (affichées dans la timeline et les panneaux). */
 export interface StepMeta {
@@ -27,6 +35,8 @@ export interface StepMeta {
   idea: string;
   /** Phase du plan global mise en évidence (id de boîte SVG). */
   schematicNode: SchematicNodeId;
+  /** Station propre au traitement de l'image (signalée dans la timeline). */
+  imageOnly?: boolean;
 }
 
 /** Identifiant d'une boîte du schéma SVG (plan global). */
@@ -39,7 +49,11 @@ export type SchematicNodeId =
   | "engine"
   | "probabilities"
   | "output"
-  | "end";
+  | "end"
+  | "patches"
+  | "vision-encoder"
+  | "projector"
+  | "sequence";
 
 /** Un token issu de la tokenisation. */
 export interface Token {
@@ -67,6 +81,31 @@ export interface Candidate {
   surprising: boolean;
 }
 
+/** Vecteurs symboliques d'un patch avant et après le projecteur. */
+export interface ImagePatchSample {
+  row: number;
+  col: number;
+  /** Sortie de l'encodeur visuel. */
+  encoded: number[];
+  /** Sortie du projecteur (espace d'embeddings du LLM). */
+  projected: number[];
+}
+
+/** Données pédagogiques de l'image de démonstration. */
+export interface ImageDemo {
+  /** Côté de l'image, en pixels. */
+  size: number;
+  /** Côté d'un patch, en pixels. */
+  patchSize: number;
+  /** Nombre de patches par côté. */
+  grid: number;
+  /** Patch mis en évidence (zoom sur ses pixels). */
+  focusPatch: { row: number; col: number };
+  /** Quelques pixels du patch mis en évidence. */
+  pixels: { label: string; rgb: [number, number, number] }[];
+  samples: ImagePatchSample[];
+}
+
 /** Paramètres du moteur d'inférence. */
 export interface EngineParams {
   temperature: number;
@@ -76,6 +115,8 @@ export interface EngineParams {
 
 /** État global unique observé par tous les composants. */
 export interface AppState {
+  /** Mode d'entrée : texte seul ou texte + image. */
+  mode: Mode;
   prompt: string;
   tokens: Token[];
   embeddings: Embedding[];
@@ -86,6 +127,4 @@ export interface AppState {
   chosenToken: string | null;
   /** Index de l'étape courante dans la liste STEPS. */
   stepIndex: number;
-  /** Lecture automatique en cours. */
-  playing: boolean;
 }

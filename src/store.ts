@@ -1,22 +1,18 @@
 import { Store } from "./state";
-import { INITIAL_STATE } from "./data";
-import { STEPS } from "./scenario";
+import { IMAGE_PROMPT_DATA, INITIAL_STATE, TEXT_PROMPT_DATA } from "./data";
+import { stepsFor } from "./scenario";
 import { softmaxWithTemperature } from "./engine";
-import type { AppState } from "./types";
+import type { AppState, Mode } from "./types";
 
 /** Instance unique du store global. */
 export const store = new Store<AppState>(INITIAL_STATE);
 
-let playTimer: ReturnType<typeof setInterval> | null = null;
-
-/** Durée d'une étape en lecture automatique (ms). */
-const AUTOPLAY_INTERVAL = 2600;
-
-/** Va à une étape précise (bornée sur la liste des étapes). */
+/** Va à une étape précise (bornée sur la liste des étapes du mode). */
 export function goToStep(index: number): void {
-  const clamped = Math.max(0, Math.min(STEPS.length - 1, index));
+  const steps = stepsFor(store.get().mode);
+  const clamped = Math.max(0, Math.min(steps.length - 1, index));
   // Le token est « choisi » dès que l'on atteint l'étape d'échantillonnage.
-  const samplingIndex = STEPS.findIndex((s) => s.id === "sampling");
+  const samplingIndex = steps.findIndex((s) => s.id === "sampling");
   const chosenToken =
     clamped >= samplingIndex
       ? (computedFinalCandidates()[0]?.text ?? null)
@@ -26,12 +22,7 @@ export function goToStep(index: number): void {
 
 /** Étape suivante. */
 export function nextStep(): void {
-  const { stepIndex } = store.get();
-  if (stepIndex >= STEPS.length - 1) {
-    pause();
-    return;
-  }
-  goToStep(stepIndex + 1);
+  goToStep(store.get().stepIndex + 1);
 }
 
 /** Étape précédente. */
@@ -39,33 +30,11 @@ export function prevStep(): void {
   goToStep(store.get().stepIndex - 1);
 }
 
-/** Lecture automatique. */
-export function play(): void {
-  if (store.get().playing) return;
-  store.set({ playing: true });
-  playTimer = setInterval(() => {
-    const { stepIndex } = store.get();
-    if (stepIndex >= STEPS.length - 1) {
-      pause();
-      return;
-    }
-    nextStep();
-  }, AUTOPLAY_INTERVAL);
-}
-
-/** Pause de la lecture automatique. */
-export function pause(): void {
-  if (playTimer) {
-    clearInterval(playTimer);
-    playTimer = null;
-  }
-  store.set({ playing: false });
-}
-
-/** Bascule lecture / pause. */
-export function togglePlay(): void {
-  if (store.get().playing) pause();
-  else play();
+/** Change de mode d'entrée et revient à la première étape. */
+export function setMode(mode: Mode): void {
+  if (store.get().mode === mode) return;
+  const data = mode === "image" ? IMAGE_PROMPT_DATA : TEXT_PROMPT_DATA;
+  store.set({ mode, ...data, stepIndex: 0, chosenToken: null });
 }
 
 /**
@@ -75,7 +44,7 @@ export function togglePlay(): void {
 export function computedCandidates() {
   const { candidates, params } = store.get();
   return softmaxWithTemperature(candidates, params.temperature).sort(
-    (a, b) => b.probability - a.probability
+    (a, b) => b.probability - a.probability,
   );
 }
 

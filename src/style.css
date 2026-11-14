@@ -11,6 +11,8 @@
   --color-accent-soft: #dbeafe;
   --color-active: #f59e0b;
   --color-active-soft: #fef3c7;
+  --color-image: #7c3aed;
+  --color-image-soft: #ede9fe;
 }
 
 html,
@@ -58,8 +60,30 @@ body {
   scrollbar-color: var(--color-border) transparent;
 }
 
-.scroll-area-x {
-  overflow-x: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-border) transparent;
+/* Dégradés signalant du contenu hors de la vue (barre d'étapes défilable). */
+.scroll-fade-t {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 28px);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 28px);
+}
+
+.scroll-fade-b {
+  -webkit-mask-image: linear-gradient(to top, transparent 0, #000 28px);
+  mask-image: linear-gradient(to top, transparent 0, #000 28px);
+}
+
+.scroll-fade-t.scroll-fade-b {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 28px,
+    #000 calc(100% - 28px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 28px,
+    #000 calc(100% - 28px),
+    transparent 100%
+  );
 }

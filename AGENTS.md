@@ -2,8 +2,11 @@
 
 **Demonstrateur pédagogique** illustrant le cycle complet d'inférence d'un LLM, step by step, à destination d'un public non spécialiste.
 
-See full spec: [01-specifications-demonstrateur-llm.md](01-specifications-demonstrateur-llm.md)  
-See full architecture: [02-architecture-demonstrateur-llm.md](02-architecture-demonstrateur-llm.md)
+See full spec: [docs/01-specifications-demonstrateur-llm.md](docs/01-specifications-demonstrateur-llm.md)  
+See full architecture: [docs/02-architecture-demonstrateur-llm.md](docs/02-architecture-demonstrateur-llm.md)
+
+Project documentation lives in `docs/`.  
+Mode "Texte + image" (multimodal LLM), implemented: [docs/03-evolution-mode-image.md](docs/03-evolution-mode-image.md).
 
 ---
 
@@ -32,30 +35,38 @@ No test suite configured.
 ### State management
 
 `src/state.ts` — custom pub/sub `Store<T>` (no Redux, no Zustand).  
-`src/store.ts` — singleton `store` + actions (`play`, `pause`, `nextStep`, `prevStep`, `goToStep`, `togglePlay`).  
+`src/store.ts` — singleton `store` + actions (`nextStep`, `prevStep`, `goToStep`, `setMode`). No autoplay: navigation is always manual.  
 All components call `store.subscribe(listener)` to re-render reactively.
+
+### Modes
+
+`AppState.mode` is `"text"` (default) or `"image"` (text + image). `setMode()` swaps prompt/tokens/embeddings and goes back to step 0. Components that depend on the step list (Timeline, Controls, StepPanel, SchematicPanel) rebuild when the mode changes.
 
 ### Step pipeline
 
-`src/scenario.ts` — `STEPS: StepMeta[]` (13 steps, one per LLM pipeline stage).  
-`src/data.ts` — `INITIAL_STATE` with fixed prompt `"Le chat dort sur le"`, tokens, embeddings, logits candidates.  
-`src/types.ts` — all domain types (`StepId`, `StepMeta`, `Token`, `Embedding`, `Candidate`, `EngineParams`, `AppState`).
+`src/scenario.ts` — `stepsFor(mode): StepMeta[]`: 13 steps in text mode, 17 in image mode (4 image steps inserted before `transformer`, flagged `imageOnly`).  
+`src/data.ts` — `INITIAL_STATE` with fixed prompt `"Le chat dort sur le"`, tokens, embeddings, logits candidates; `IMAGE_PROMPT_DATA` and `IMAGE_DEMO` (224 px image, 16 px patches, 14×14 grid) for image mode.  
+`src/types.ts` — all domain types (`StepId`, `StepMeta`, `Mode`, `Token`, `Embedding`, `Candidate`, `EngineParams`, `ImageDemo`, `AppState`).
 
-Pipeline steps (in order): `prompt → tokenize → embeddings → transformer → logits → topk → softmax → topp → probabilities → sampling → append-token → loop → eos`
+Text-mode steps (in order): `prompt → tokenize → embeddings → transformer → logits → topk → softmax → topp → probabilities → sampling → append-token → loop → eos`
+
+Image mode inserts `patches → vision-encoder → image-tokens → sequence` after `embeddings`.
 
 ### Components (all vanilla TS, return `HTMLElement`)
 
-| File                               | Role                                                       |
-| ---------------------------------- | ---------------------------------------------------------- |
-| `src/app.ts`                       | Shell grid (header / main / footer), mounts all components |
-| `src/components/Timeline.ts`       | Top "metro line" navigator                                 |
-| `src/components/Controls.ts`       | Play/pause/prev/next buttons                               |
-| `src/components/StepPanel.ts`      | Left panel: step title, idea, detail                       |
-| `src/components/stepRenderers.ts`  | Per-step content renderers (one per `StepId`)              |
-| `src/components/SchematicPanel.ts` | Right SVG schematic (BOXES + CONTAINERS data-driven)       |
-| `src/dom.ts`                       | `h()` and `svgEl()` helpers, `clear()`                     |
-| `src/animation.ts`                 | `animateIn()`, `animateTitle()` using Motion               |
-| `src/engine.ts`                    | `softmaxWithTemperature()`, `formatProbability()`          |
+| File                               | Role                                                         |
+| ---------------------------------- | ------------------------------------------------------------ |
+| `src/app.ts`                       | Shell grid (header / 3-col main / footer), mounts components |
+| `src/components/Timeline.ts`       | Left sidebar: vertical "metro line" navigator (scrollable)   |
+| `src/components/Controls.ts`       | Prev/next buttons + step counter                             |
+| `src/components/ModeToggle.ts`     | Text / Text + image switch                                   |
+| `src/components/catImage.ts`       | SVG demo image, patch grid and patch zoom                    |
+| `src/components/StepPanel.ts`      | Left panel: step title, idea, detail                         |
+| `src/components/stepRenderers.ts`  | Per-step content renderers (one per `StepId`)                |
+| `src/components/SchematicPanel.ts` | Right SVG schematic (BOXES + CONTAINERS data-driven)         |
+| `src/dom.ts`                       | `h()` and `svgEl()` helpers, `clear()`                       |
+| `src/animation.ts`                 | `animateIn()`, `animateTitle()` using Motion                 |
+| `src/engine.ts`                    | `softmaxWithTemperature()`, `formatProbability()`            |
 
 ### Computed values (derived from store state on demand)
 
@@ -80,8 +91,9 @@ Pipeline steps (in order): `prompt → tokenize → embeddings → transformer �
 
 ## SchematicPanel SVG specifics
 
-- `viewBox="0 0 400 700"`, `CENTER_X=190`
+- `viewBox="0 0 400 H"` with `H=760` (text) or `864` (image), `CENTER_X=190`; the SVG is scaled to fit the panel (no scroll)
 - Shapes: `"io"` (parallelogram) for inputs/outputs; `"rect"` for processing nodes
 - Dashed container "Moteur d'inférence" wraps nested container "LLM · modèle"
 - Dashed loop arrow on the right side
-- Layout fully data-driven via `BOXES` and `CONTAINERS` arrays — do not hardcode coordinates
+- Layout is data-driven per mode (`textLayout()` / `imageLayout()` returning boxes, containers and edges) — do not hardcode coordinates elsewhere; the SVG is rebuilt on mode change
+- Image mode: text branch on the left, image branch (violet, `image: true`) on the right, merging in the `sequence` box

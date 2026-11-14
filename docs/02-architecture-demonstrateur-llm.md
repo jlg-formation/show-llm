@@ -65,7 +65,7 @@ Exemple :
   "softmax",
   "sampling",
   "append-token",
-  "loop"
+  "loop",
 ];
 ```
 
@@ -73,13 +73,18 @@ Les animations sont découplées du contenu.
 
 ## Barre temporelle
 
-Une barre de progression représente toutes les étapes.
+Une barre de progression représente toutes les étapes. Elle est
+verticale et placée dans une barre latérale gauche.
 
-    ○────○────○────○────○────○────○────○
+    ○
+    │
+    ○
+    │
+    ○
 
 Fonctionnalités : - clic sur une étape ; - animation avant ou arrière
-jusqu'à cette étape ; - lecture automatique ; - pause ; - étape
-précédente/suivante.
+jusqu'à cette étape ; - étape précédente/suivante. Il n'y a pas de lecture
+automatique : la progression est toujours manuelle.
 
 Le formateur peut ainsi naviguer librement pendant son explication.
 
@@ -87,7 +92,8 @@ Le formateur peut ainsi naviguer librement pendant son explication.
 
 Un état unique contient notamment : - prompt courant ; - tokens ; -
 embeddings (version pédagogique) ; - logits ; - probabilités ; -
-paramètres (température, top-p, top-k...) ; - étape courante.
+paramètres (température, top-p, top-k...) ; - mode d'entrée (texte ou
+texte + image) ; - étape courante.
 
 Tous les composants observent cet état.
 
@@ -100,42 +106,43 @@ hauteur de la fenêtre. **Aucun scroll global** : la page ne défile
 jamais dans son ensemble.
 
 ```text
-┌─────────────────────────────────────────────┐
-│ HEADER : timeline (plan de ligne de métro)   │  hauteur fixe
-├──────────────────────┬──────────────────────┤
-│                      │                      │
-│  BODY GAUCHE         │  BODY DROITE         │  hauteur flexible
-│  étape en cours      │  plan global         │
-│  (scrollable)        │  (scrollable si      │
-│                      │   nécessaire)        │
-│                      │                      │
-├──────────────────────┴──────────────────────┤
-│ FOOTER : @JLG Consulting 2026 — GitHub       │  hauteur fixe
-└─────────────────────────────────────────────┘
++----------------------------------------------------------+
+| HEADER : site-id | bascule de mode | prec./suiv. | n/N   |  hauteur fixe
++---------+-------------------------+----------------------+
+| ETAPES  | BODY CENTRE             | BODY DROITE          |  hauteur flexible
+| (metro  | etape en cours          | plan global          |
+| vertical| (scrollable)            | (sans scroll,        |
+| scroll.)|                         |  tient a l'ecran)    |
++---------+-------------------------+----------------------+
+| FOOTER : @JLG Consulting 2026 - GitHub                   |  hauteur fixe
++----------------------------------------------------------+
 ```
 
 Mise en œuvre recommandée : conteneur racine en `display: grid`
 (ou `flex` colonne) avec `height: 100vh` et
-`grid-template-rows: auto 1fr auto`. Le corps utilise deux colonnes
-(`grid-template-columns: 1fr 1fr`).
+`grid-template-rows: auto 1fr auto`. Le corps utilise trois colonnes
+(`grid-template-columns: 13rem 1fr 1fr`).
 
-### Header — Timeline
+### Header
 
 - Affiche le **site-id** « Show LLM » (titre / logo de l'application).
-- Affiche la ligne de la timeline **façon plan de ligne de métro**
-  (stations = étapes reliées par un trait).
-- La timeline peut être **scrollable horizontalement** (un _slider_,
-  façon site Netflix) lorsque les étapes dépassent la largeur
-  disponible.
+- Porte la **bascule de mode** Texte / Texte + image (voir
+  [03-evolution-mode-image.md](03-evolution-mode-image.md)).
+- Porte les boutons **précédent / suivant** et le compteur d'étapes.
 - Hauteur fixe, toujours visible.
-- Reprend les fonctionnalités de la barre temporelle (clic sur une
-  étape, lecture, pause, étape précédente/suivante).
 
-### Body — deux panneaux
+### Body — trois panneaux
 
-L'écran est séparé en deux colonnes (gauche et droite).
+**Gauche — barre d'étapes**
 
-**Gauche — étape en cours**
+- Ligne de la timeline **façon plan de ligne de métro**, verticale
+  (stations = étapes reliées par un trait).
+- Largeur fixe et étroite, non repliable (desktop only).
+- Zone **scrollable** verticalement si les étapes dépassent la hauteur
+  disponible ; l'étape active est ramenée dans la vue.
+- Clic sur une station pour accéder à l'étape.
+
+**Centre — étape en cours**
 
 - Montre le détail visuel de l'**étape courante** uniquement.
 - Le contenu **change au fur et à mesure des étapes**.
@@ -146,8 +153,9 @@ L'écran est séparé en deux colonnes (gauche et droite).
 - Montre un **plan global du moteur, du LLM et des phases**.
 - Met en évidence la phase active et **reflète les modifications** au
   fil de la progression (l'étape en cours est signalée sur le plan).
-- Zone **scrollable si nécessaire** (défilement interne au panneau,
-  uniquement si le contenu dépasse la hauteur disponible).
+- **Pas de scroll** : le plan est mis à l'échelle (SVG `viewBox`) pour
+  tenir entièrement dans la hauteur et la largeur du panneau, dans les
+  deux modes.
 
 ### Footer
 
@@ -176,5 +184,8 @@ Déploiement cible : - GitHub Pages.
 - vitesse d'animation réglable ;
 - exemples de prompts interchangeables ;
 - export en mode présentation plein écran ;
+- mode « Texte + image » (LLM multimodal) avec un scénario dédié et une
+  timeline défilable : voir
+  [03-evolution-mode-image.md](03-evolution-mode-image.md) ;
 - prise en charge d'autres démonstrations (tool calling, RAG, etc.)
   basées sur le même moteur d'animation.

@@ -1,6 +1,6 @@
 import { h, svgEl } from "../dom";
-import { STEPS } from "../scenario";
-import { store, nextStep, prevStep, togglePlay } from "../store";
+import { stepsFor } from "../scenario";
+import { store, nextStep, prevStep } from "../store";
 
 /** Chevron SVG (gauche ou droite), gros et centré dans le bouton. */
 function chevron(direction: "left" | "right"): SVGElement {
@@ -13,13 +13,13 @@ function chevron(direction: "left" | "right"): SVGElement {
     stroke: "currentColor",
     "stroke-width": 2.5,
     "stroke-linecap": "round",
-    "stroke-linejoin": "round"
+    "stroke-linejoin": "round",
   });
   svg.append(svgEl("path", { d }));
   return svg;
 }
 
-/** Barre de contrôles de lecture : précédent / play-pause / suivant. */
+/** Barre de contrôles : précédent / suivant + compteur d'étapes. */
 export function createControls(): HTMLElement {
   const prevBtn = h(
     "button",
@@ -27,20 +27,9 @@ export function createControls(): HTMLElement {
       class: btnClass(),
       type: "button",
       title: "Étape précédente",
-      onclick: () => prevStep()
+      onclick: () => prevStep(),
     },
-    [chevron("left") as unknown as Node]
-  );
-
-  const playBtn = h(
-    "button",
-    {
-      class: btnClass() + " w-12 text-base",
-      type: "button",
-      title: "Lecture / Pause",
-      onclick: () => togglePlay()
-    },
-    ["▶"]
+    [chevron("left")],
   );
 
   const nextBtn = h(
@@ -49,31 +38,34 @@ export function createControls(): HTMLElement {
       class: btnClass(),
       type: "button",
       title: "Étape suivante",
-      onclick: () => nextStep()
+      onclick: () => nextStep(),
     },
-    [chevron("right") as unknown as Node]
+    [chevron("right")],
   );
 
   const counter = h(
     "span",
-    { class: "ml-2 text-xs tabular-nums text-[var(--color-muted)]" },
-    [""]
+    {
+      class: "ml-2 w-12 text-xs tabular-nums text-[var(--color-muted)]",
+    },
+    [""],
   );
 
   const bar = h("div", { class: "flex shrink-0 items-center gap-2 pl-4" }, [
     prevBtn,
     nextBtn,
     counter,
-    playBtn
   ]);
 
   store.subscribe((state) => {
-    playBtn.textContent = state.playing ? "⏸" : "▶";
-    prevBtn.toggleAttribute("disabled", state.stepIndex === 0);
-    nextBtn.toggleAttribute("disabled", state.stepIndex === STEPS.length - 1);
-    prevBtn.style.opacity = state.stepIndex === 0 ? "0.4" : "1";
-    nextBtn.style.opacity = state.stepIndex === STEPS.length - 1 ? "0.4" : "1";
-    counter.textContent = `${state.stepIndex + 1} / ${STEPS.length}`;
+    const total = stepsFor(state.mode).length;
+    const atStart = state.stepIndex === 0;
+    const atEnd = state.stepIndex === total - 1;
+    prevBtn.toggleAttribute("disabled", atStart);
+    nextBtn.toggleAttribute("disabled", atEnd);
+    prevBtn.style.opacity = atStart ? "0.4" : "1";
+    nextBtn.style.opacity = atEnd ? "0.4" : "1";
+    counter.textContent = `${state.stepIndex + 1} / ${total}`;
   });
 
   return bar;
