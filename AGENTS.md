@@ -18,9 +18,11 @@ See full architecture: [02-architecture-demonstrateur-llm.md](02-architecture-de
 ## Commands
 
 ```bash
-npm run dev      # http://localhost:5173/show-llm/
-npm run build    # tsc && vite build → dist/
-npm run preview  # preview built dist/
+mise install     # installs Bun (version pinned in mise.toml)
+bun install      # install dependencies (bun.lock)
+bun run dev      # http://localhost:5173/show-llm/
+bun run build    # tsc && vite build → dist/
+bun run preview  # preview built dist/
 ```
 
 No test suite configured.
@@ -73,8 +75,8 @@ Pipeline steps (in order): `prompt → tokenize → embeddings → transformer �
 
 - **Motion `animate()`**: pass `Array.from(NodeList)` (not NodeList directly), use native CSS props (`opacity`, `y`, `x`). Do NOT pass `transform` as a string or use `easing` as a string — TypeScript will pick the wrong overload.
 - **Tailwind v4**: no `tailwind.config.js`. Configuration via CSS `@theme` blocks in `src/style.css`.
-- **`npm run build`**: runs `tsc` first, then `vite build`. Fix TypeScript errors before investigating Vite build errors.
-- **Deployment**: `.github/workflows/deploy.yml` uses `actions/deploy-pages@v4`. `package-lock.json` is required (`npm ci`). Push to `main` triggers auto-deploy.
+- **`bun run build`**: runs `tsc` first, then `vite build`. Fix TypeScript errors before investigating Vite build errors.
+- **Deployment**: `.github/workflows/deploy.yml` uses `actions/deploy-pages@v4`. `bun.lock` is required (`bun install --frozen-lockfile`); Bun is installed in CI via `jdx/mise-action` from `mise.toml`. Push to `main` triggers auto-deploy.
 
 ## SchematicPanel SVG specifics
 
