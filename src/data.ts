@@ -1,4 +1,11 @@
-import type { AppState, Candidate, Embedding, ImageDemo, Token } from "./types";
+import type {
+  AppState,
+  Candidate,
+  Embedding,
+  ImageDemo,
+  OpenModel,
+  Token,
+} from "./types";
 
 /**
  * Données figées du scénario pédagogique.
@@ -103,10 +110,12 @@ export const IMAGE_DEMO: ImageDemo = {
   patchSize: 16,
   grid: 14,
   focusPatch: { row: 8, col: 9 },
+  encoderDim: 1024,
+  llmDim: 4096,
   pixels: [
-    { label: "fourrure", rgb: [232, 160, 76] },
-    { label: "museau", rgb: [228, 138, 138] },
-    { label: "paupière", rgb: [59, 42, 32] },
+    { label: "orange", rgb: [232, 160, 76] },
+    { label: "rose", rgb: [228, 138, 138] },
+    { label: "brun foncé", rgb: [59, 42, 32] },
   ],
   samples: [
     {
@@ -135,6 +144,57 @@ export const IMAGE_DEMO: ImageDemo = {
     },
   ],
 };
+
+/** Dimensions publiques de quelques LLM open weight (valeurs de leurs configs). */
+export const OPEN_MODELS: OpenModel[] = [
+  { name: "gpt-oss-20b", layers: 24, embeddingDim: 2880, vocabSize: 201088 },
+  { name: "gpt-oss-120b", layers: 36, embeddingDim: 2880, vocabSize: 201088 },
+  { name: "Llama 3.1 8B", layers: 32, embeddingDim: 4096, vocabSize: 128256 },
+  { name: "Llama 3.1 70B", layers: 80, embeddingDim: 8192, vocabSize: 128256 },
+  { name: "Qwen2.5 72B", layers: 80, embeddingDim: 8192, vocabSize: 152064 },
+  { name: "Mistral 7B", layers: 32, embeddingDim: 4096, vocabSize: 32000 },
+  {
+    name: "DeepSeek-V3 671B",
+    layers: 61,
+    embeddingDim: 7168,
+    vocabSize: 129280
+  }
+];
+
+/** Meta tokens (tokens spéciaux) : [nom, identifiant ou usage]. */
+export const META_TOKENS_O200K: string[][] = [
+  ["<|endoftext|>", "#199999"],
+  ["<|endofprompt|>", "#200018"],
+];
+
+export const META_TOKENS_HARMONY: string[][] = [
+  ["<|start|>", "#200006"],
+  ["<|message|>", "#200008"],
+  ["<|end|>", "#200007"],
+  ["<|channel|>", "#200005"],
+  ["<|return|>", "#200002"],
+];
+
+export const META_TOKENS_IMAGE: string[][] = [
+  ["Qwen2-VL", "<|vision_start|> … <|vision_end|>"],
+  ["Gemma 3", "<start_of_image> … <end_of_image>"],
+  ["Llama 3.2 Vision", "<|image|>"],
+  ["LLaVA", "<image>"],
+];
+
+/** Longueur du vecteur de sortie de quelques encodeurs visuels. */
+export const VISION_ENCODERS: { name: string; dim: number }[] = [
+  { name: "CLIP ViT-L/14 (LLaVA-1.5)", dim: 1024 },
+  { name: "SigLIP so400m", dim: 1152 },
+  { name: "ViT-H/14 (Llama 3.2 Vision)", dim: 1280 }
+];
+
+/** Longueurs avant / après le projecteur de quelques VLM open weight. */
+export const PROJECTORS: { name: string; from: number; to: number }[] = [
+  { name: "LLaVA-1.5 7B", from: 1024, to: 4096 },
+  { name: "LLaVA-1.5 13B", from: 1024, to: 5120 },
+  { name: "Qwen2.5-VL 7B", from: 1280, to: 3584 }
+];
 
 export const INITIAL_STATE: AppState = {
   mode: "text",

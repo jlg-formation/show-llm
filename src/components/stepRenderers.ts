@@ -2,7 +2,15 @@ import { h, svgEl } from "../dom";
 import type { AppState, StepId } from "../types";
 import { computedCandidates, computedFinalCandidates } from "../store";
 import { formatProbability } from "../engine";
-import { IMAGE_DEMO } from "../data";
+import {
+  IMAGE_DEMO,
+  META_TOKENS_HARMONY,
+  META_TOKENS_IMAGE,
+  META_TOKENS_O200K,
+  OPEN_MODELS,
+  PROJECTORS,
+  VISION_ENCODERS,
+} from "../data";
 import { createCatImage, createPatchView } from "./catImage";
 
 /**
@@ -56,7 +64,7 @@ function card(children: (Node | string)[], extra = ""): HTMLElement {
   return h(
     "div",
     {
-      class: `anim-item rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-5 shadow-sm ${extra}`,
+      class: `anim-item rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm ${extra}`,
     },
     children,
   );
@@ -121,6 +129,47 @@ function renderTokenize(state: AppState): HTMLElement {
         "La phrase est découpée en tokens, chacun avec un identifiant :",
       ]),
       h("div", { class: "flex flex-wrap gap-2" }, chips),
+      h("p", { class: "anim-item mt-3 text-xs font-semibold text-[var(--color-muted)]" }, [
+        "Les identifiants (#…) des tokens de cette phrase sont fictifs, choisis pour l'exemple. Ce ne sont pas ceux d'un vrai tokenizer.",
+      ]),
+      h("p", { class: "anim-item mt-2 text-sm" }, [
+        "Pour voir de vrais tokenizers en action, rendez-vous sur ",
+        h(
+          "a",
+          {
+            class: "font-semibold text-[var(--color-accent)] hover:underline",
+            href: "https://jlg-formation.github.io/tokenizer/",
+            target: "_blank",
+            rel: "noopener noreferrer",
+          },
+          ["jlg-formation.github.io/tokenizer"],
+        ),
+        ".",
+      ]),
+    ]),
+    card([
+      h("p", { class: "text-sm text-[var(--color-muted)]" }, [
+        "Un tokenizer contient aussi des meta tokens : des tokens spéciaux qui ne sont pas du texte mais structurent la séquence (fin de texte, début de message, début d'image…).",
+      ]),
+      refList(
+        "o200k_base (tokenizer OpenAI) : ~200 000 tokens de texte + 2 meta tokens :",
+        META_TOKENS_O200K,
+      ),
+      refList(
+        "o200k_harmony (variante de gpt-oss), meta tokens de conversation :",
+        META_TOKENS_HARMONY,
+      ),
+      ...(state.mode === "image"
+        ? [
+            refList(
+              "Meta tokens d'image, sur quelques VLM open weight :",
+              META_TOKENS_IMAGE,
+            ),
+            h("p", { class: "anim-item mt-2 text-xs text-[var(--color-muted)]" }, [
+              "o200k_base ne définit pas de meta token d'image ; comment GPT-4o délimite ses images n'est pas public. Chaque modèle open weight a les siens.",
+            ]),
+          ]
+        : []),
     ]),
   ]);
 }
@@ -169,9 +218,13 @@ function renderEmbeddings(state: AppState): HTMLElement {
   return wrap([
     card([
       h("p", { class: "mb-3 text-sm text-[var(--color-muted)]" }, [
-        "Chaque token est lu dans une table d'embeddings et devient un vecteur. Représentation simplifiée (6 dimensions au lieu de plusieurs milliers) :",
+        "Chaque token est lu dans une table d'embeddings et devient un vecteur. Représentation simplifiée (6 nombres ici, des milliers en vrai) ; identifiants de token fictifs :",
       ]),
       h("div", { class: "flex flex-col gap-2" }, rows),
+      refList(
+        "Longueur réelle d'un embedding, sur quelques LLM open weight :",
+        OPEN_MODELS.map((m) => [m.name, `${fmt(m.embeddingDim)} nombres`]),
+      ),
     ]),
   ]);
 }
@@ -216,24 +269,18 @@ function renderTransformer(state: AppState): HTMLElement {
             ]
           : []),
         h("p", { class: "mt-4 mb-1 text-xs font-semibold text-slate-400" }, [
-          "Nombre de couches sur quelques LLM open weight :",
+          "Couches et longueur des vecteurs sur quelques LLM open weight (la longueur reste la même d'une couche à l'autre) :",
         ]),
         h(
           "ul",
           { class: "flex flex-col gap-0.5 text-xs text-slate-300" },
-          [
-            ["gpt-oss-20b", "24 couches"],
-            ["gpt-oss-120b", "36 couches"],
-            ["Llama 3.1 8B", "32 couches"],
-            ["Llama 3.1 70B", "80 couches"],
-            ["Qwen2.5 72B", "80 couches"],
-            ["Mistral 7B", "32 couches"],
-            ["DeepSeek-V3 671B", "61 couches"],
-          ].map(([name, count]) =>
+          OPEN_MODELS.map((m) =>
             h("li", { class: "flex items-baseline gap-2" }, [
-              h("span", { class: "font-mono text-slate-100" }, [name]),
+              h("span", { class: "font-mono text-slate-100" }, [m.name]),
               h("span", { class: "text-slate-400" }, ["→"]),
-              h("span", {}, [count]),
+              h("span", {}, [
+                `${m.layers} couches · vecteurs de ${fmt(m.embeddingDim)} nombres`,
+              ]),
             ]),
           ),
         ),
@@ -298,6 +345,13 @@ function renderLogits(state: AppState): HTMLElement {
         "Les logits peuvent être positifs ou négatifs. Ce ne sont pas des probabilités. Aperçu de quelques tokens :",
       ]),
       h("div", { class: "flex flex-col gap-2" }, bars),
+      refList(
+        "Le vecteur de logits a une longueur égale à la taille du vocabulaire :",
+        OPEN_MODELS.filter((m) => m.name !== "gpt-oss-120b").map((m) => [
+          m.name,
+          `${fmt(m.vocabSize)} logits`,
+        ]),
+      ),
     ]),
   ]);
 }
@@ -656,7 +710,7 @@ function renderSoftmax(state: AppState): HTMLElement {
       ]),
       (() => {
         const box = h("div", {
-          class: "anim-item rounded-lg bg-slate-50 p-4 text-center",
+          class: "anim-item rounded-lg bg-slate-50 p-2 text-center",
         });
         box.innerHTML = `
           <math display="block" style="font-size:1.25rem">
@@ -684,7 +738,7 @@ function renderSoftmax(state: AppState): HTMLElement {
           </math>`;
         return box;
       })(),
-      h("p", { class: "mb-2 mt-4 text-xs text-[var(--color-muted)]" }, [
+      h("p", { class: "mb-2 mt-3 text-xs text-[var(--color-muted)]" }, [
         `Appliqué à chaque logit (T = ${state.params.temperature.toLocaleString(
           "fr-FR",
         )}), on obtient la probabilité de chaque token :`,
@@ -844,6 +898,67 @@ function renderEos(): HTMLElement {
 const IMAGE_CHIP =
   "border-[var(--color-image)] bg-[var(--color-image-soft)] text-[var(--color-image)]";
 
+function fmt(n: number): string {
+  return n.toLocaleString("fr-FR");
+}
+
+/** Liste de référence : « nom → valeur » sur deux colonnes. */
+function refList(title: string, rows: string[][]): HTMLElement {
+  return h("div", { class: "anim-item mt-4" }, [
+    h("p", { class: "mb-1 text-xs font-semibold text-[var(--color-muted)]" }, [
+      title,
+    ]),
+    h(
+      "ul",
+      { class: "grid grid-cols-2 gap-x-6 gap-y-0.5 text-xs" },
+      rows.map(([name, value]) =>
+        h("li", { class: "flex items-baseline gap-2" }, [
+          h("span", { class: "font-mono text-[var(--color-ink)]" }, [name]),
+          h("span", { class: "text-[var(--color-muted)]" }, ["→"]),
+          h("span", {}, [value]),
+        ]),
+      ),
+    ),
+  ]);
+}
+
+function dimBadge(value: string, label: string, image = false): HTMLElement {
+  return h(
+    "div",
+    {
+      class: `flex flex-col items-center rounded-lg border px-3 py-1.5 ${
+        image
+          ? IMAGE_CHIP
+          : "border-[var(--color-border)] bg-slate-100 text-[var(--color-ink)]"
+      }`,
+    },
+    [
+      h("span", { class: "font-mono text-base font-bold" }, [value]),
+      h("span", { class: "text-xs text-[var(--color-muted)]" }, [label]),
+    ],
+  );
+}
+
+/** Entrée → traitement → sortie, avec les longueurs de vecteur. */
+function dimFlow(from: HTMLElement, via: string, to: HTMLElement): HTMLElement {
+  const arrow = () =>
+    h("span", { class: "text-xl text-[var(--color-muted)]" }, ["⟶"]);
+  return h("div", { class: "anim-item mb-3 flex flex-wrap items-center gap-3" }, [
+    from,
+    arrow(),
+    h(
+      "span",
+      {
+        class:
+          "rounded-md border border-dashed border-slate-400 px-2 py-1 text-xs text-[var(--color-muted)]",
+      },
+      [via],
+    ),
+    arrow(),
+    to,
+  ]);
+}
+
 function vectorView(values: number[], image = false): HTMLElement {
   return h("div", { class: "flex items-center gap-1 font-mono text-sm" }, [
     h("span", { class: "text-[var(--color-muted)]" }, ["["]),
@@ -890,7 +1005,7 @@ function renderPatches(): HTMLElement {
     swatch.style.background = `rgb(${rgb.join(",")})`;
     return h("div", { class: "flex items-center gap-2 text-xs" }, [
       swatch,
-      h("span", { class: "w-16 text-[var(--color-muted)]" }, [label]),
+      h("span", { class: "w-20 text-[var(--color-muted)]" }, [label]),
       h("span", { class: "font-mono" }, [`(${rgb.join(", ")})`]),
     ]);
   });
@@ -935,7 +1050,7 @@ function renderPatches(): HTMLElement {
           ]),
           h("div", { class: "flex flex-col gap-1" }, pixelRows),
           h("p", { class: "text-xs text-[var(--color-muted)]" }, [
-            `${patchSize} × ${patchSize} × 3 = ${patchSize * patchSize * 3} valeurs par patch`,
+            `${patchSize} × ${patchSize} pixels × 3 couleurs (R, V, B) = ${patchSize * patchSize * 3} valeurs par patch`,
           ]),
         ]),
       ]),
@@ -945,14 +1060,14 @@ function renderPatches(): HTMLElement {
         stat(`${grid} × ${grid} = ${total} patches`, true),
       ]),
       h("p", { class: "anim-item mt-3 text-xs text-[var(--color-muted)]" }, [
-        "Selon les modèles, les patches font 14 ou 16 pixels (ex. : 336 px en patches de 14 px → 24 × 24 = 576 patches).",
+        `Ici : ${patchSize} × ${patchSize} pixels. Dans les VLM, les tailles les plus courantes sont 14 × 14 (CLIP, SigLIP, Qwen-VL) et 16 × 16 (ViT, Pixtral).`,
       ]),
     ]),
   ]);
 }
 
 function renderVisionEncoder(): HTMLElement {
-  const { grid, samples } = IMAGE_DEMO;
+  const { grid, samples, patchSize, encoderDim } = IMAGE_DEMO;
   const rows = samples.map((s) =>
     h("div", { class: "anim-item flex items-center gap-3" }, [
       patchThumb(s.row, s.col),
@@ -971,7 +1086,15 @@ function renderVisionEncoder(): HTMLElement {
   return wrap([
     card([
       h("p", { class: "mb-3 text-sm text-[var(--color-muted)]" }, [
-        "Chaque patch passe dans un encodeur visuel qui le transforme en un vecteur. Quelques patches d'exemple (ligne, colonne), avec une représentation simplifiée à 6 dimensions :",
+        "Chaque patch passe dans un encodeur visuel qui le transforme en un vecteur.",
+      ]),
+      dimFlow(
+        dimBadge(fmt(patchSize * patchSize * 3), "valeurs de pixels"),
+        "encodeur visuel",
+        dimBadge(fmt(encoderDim), "nombres (vecteur)", true),
+      ),
+      h("p", { class: "mb-3 text-xs text-[var(--color-muted)]" }, [
+        `Quelques patches d'exemple (ligne, colonne). Un vrai vecteur compte par exemple ${fmt(encoderDim)} nombres ; on n'en montre que 6 :`,
       ]),
       h("div", { class: "flex flex-col gap-3" }, rows),
       h("p", { class: "anim-item mt-4 text-sm font-semibold" }, [
@@ -980,29 +1103,33 @@ function renderVisionEncoder(): HTMLElement {
       h("p", { class: "anim-item mt-2 text-xs text-[var(--color-muted)]" }, [
         "Contrairement aux tokens texte, ce vecteur n'est pas lu dans une table : il est calculé par un réseau de neurones (l'encodeur visuel, souvent un ViT).",
       ]),
+      refList(
+        "Longueur du vecteur en sortie, sur quelques encodeurs visuels :",
+        VISION_ENCODERS.map((e) => [e.name, `${fmt(e.dim)} nombres`]),
+      ),
     ]),
   ]);
 }
 
 function renderImageTokens(): HTMLElement {
-  const { samples } = IMAGE_DEMO;
-  const rows = samples.map((s) =>
+  const { samples, encoderDim, llmDim } = IMAGE_DEMO;
+  const rows = samples.slice(0, 3).map((s) =>
     h("div", { class: "anim-item flex items-center gap-3" }, [
       patchThumb(s.row, s.col),
       h("div", { class: "flex flex-col gap-1" }, [
         h("div", { class: "flex items-center gap-2" }, [
           h(
             "span",
-            { class: "w-20 shrink-0 text-xs text-[var(--color-muted)]" },
-            ["encodeur"],
+            { class: "w-28 shrink-0 text-xs text-[var(--color-muted)]" },
+            [`encodeur · ${fmt(encoderDim)}`],
           ),
           vectorView(s.encoded),
         ]),
         h("div", { class: "flex items-center gap-2" }, [
           h(
             "span",
-            { class: "w-20 shrink-0 text-xs text-[var(--color-image)]" },
-            ["projeté"],
+            { class: "w-28 shrink-0 text-xs text-[var(--color-image)]" },
+            [`projeté · ${fmt(llmDim)}`],
           ),
           vectorView(s.projected, true),
         ]),
@@ -1029,14 +1156,31 @@ function renderImageTokens(): HTMLElement {
   return wrap([
     card([
       h("p", { class: "mb-3 text-sm text-[var(--color-muted)]" }, [
-        "Un projecteur adapte chaque vecteur à l'espace d'embeddings du LLM (par exemple de 1 024 à 4 096 dimensions). Le résultat est un token image :",
+        `Pourquoi projeter ? L'encodeur visuel et le LLM ont été conçus séparément : leurs vecteurs n'ont pas la même longueur. Le LLM n'accepte que des vecteurs de sa taille, la même que celle de ses embeddings de tokens texte. Le projecteur, un petit réseau (souvent 1 ou 2 couches linéaires), convertit chaque vecteur.`,
+      ]),
+      dimFlow(
+        dimBadge(fmt(encoderDim), "nombres (encodeur)"),
+        "projecteur",
+        dimBadge(fmt(llmDim), "nombres (token image)", true),
+      ),
+      h(
+        "p",
+        {
+          class: `anim-item mb-3 rounded-lg border px-3 py-2 text-sm font-semibold ${IMAGE_CHIP}`,
+        },
+        [
+          `« Chaque patch est projeté séparément : 1 vecteur de patch → 1 token image. Ici, ${IMAGE_DEMO.grid * IMAGE_DEMO.grid} patches → ${IMAGE_DEMO.grid * IMAGE_DEMO.grid} tokens image. »`,
+        ],
+      ),
+      h("p", { class: "mb-3 text-xs text-[var(--color-muted)]" }, [
+        "Quelques patches d'exemple (6 premières valeurs de chaque vecteur) :",
       ]),
       h("div", { class: "flex flex-col gap-3" }, rows),
       h("p", { class: "anim-item mt-4 mb-2 text-sm font-semibold" }, [
         "Token texte ou token image ?",
       ]),
       h("div", { class: "anim-item flex flex-wrap items-center gap-4" }, [
-        chip(" chat", "#15821", false),
+        chip(" chat", "#15821 (fictif)", false),
         chip(
           patchLabel(samples[1].row, samples[1].col),
           "aucun identifiant",
@@ -1046,12 +1190,19 @@ function renderImageTokens(): HTMLElement {
       h("p", { class: "anim-item mt-3 text-xs text-[var(--color-muted)]" }, [
         "Un token texte vient de la table d'embeddings via son identifiant. Un token image a la même forme qu'un embedding, mais ne correspond à aucun mot du vocabulaire.",
       ]),
+      refList(
+        "Longueur avant → après le projecteur, sur quelques VLM open weight :",
+        PROJECTORS.map((p) => [
+          p.name,
+          `${fmt(p.from)} → ${fmt(p.to)} nombres`,
+        ]),
+      ),
     ]),
   ]);
 }
 
 function renderSequence(state: AppState): HTMLElement {
-  const { grid } = IMAGE_DEMO;
+  const { grid, llmDim } = IMAGE_DEMO;
   const imageCount = grid * grid;
   const total = imageCount + 2 + state.tokens.length;
   const marker = (text: string) =>
@@ -1091,7 +1242,7 @@ function renderSequence(state: AppState): HTMLElement {
   return wrap([
     card([
       h("p", { class: "mb-3 text-sm text-[var(--color-muted)]" }, [
-        "Les tokens image sont insérés entre deux marqueurs spéciaux, suivis des tokens du texte : une seule séquence entre dans le Transformer.",
+        "Les tokens image sont encadrés par deux meta tokens (voir l'étape Tokenisation ; leur nom varie selon le modèle), suivis des tokens du texte : une seule séquence entre dans le Transformer.",
       ]),
       h("div", { class: "flex flex-wrap items-center gap-2" }, [
         marker("<img>"),
@@ -1103,7 +1254,13 @@ function renderSequence(state: AppState): HTMLElement {
         ...textChips,
       ]),
       h("p", { class: "anim-item mt-4 text-sm font-semibold" }, [
-        `${imageCount} tokens image + 2 marqueurs + ${state.tokens.length} tokens texte = ${total} tokens`,
+        `${imageCount} tokens image + 2 meta tokens + ${state.tokens.length} tokens texte = ${total} tokens`,
+      ]),
+      h("p", { class: "anim-item mt-1 text-xs text-[var(--color-muted)]" }, [
+        "Identifiants des tokens texte fictifs.",
+      ]),
+      h("p", { class: "anim-item mt-2 text-sm" }, [
+        `Chaque token est un vecteur de ${fmt(llmDim)} nombres : la séquence représente ${total} × ${fmt(llmDim)} = ${fmt(total * llmDim)} nombres.`,
       ]),
       h("p", { class: "anim-item mt-2 text-xs text-[var(--color-muted)]" }, [
         "Une image consomme beaucoup de contexte : ici ",

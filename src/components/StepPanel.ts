@@ -15,7 +15,7 @@ export function createStepPanel(): HTMLElement {
   const idea = h("p", {
     class: "mt-1 text-sm text-[var(--color-muted)]",
   });
-  const headerBlock = h("div", { class: "mb-5" }, [title, idea]);
+  const headerBlock = h("div", { class: "mb-3" }, [title, idea]);
 
   const content = h("div", { class: "flex-1" });
 
@@ -23,7 +23,7 @@ export function createStepPanel(): HTMLElement {
     "section",
     {
       class:
-        "scroll-area flex h-full flex-col border-r border-[var(--color-border)] bg-[var(--color-bg)] px-8 py-6",
+        "scroll-area flex h-full flex-col border-r border-[var(--color-border)] bg-[var(--color-bg)] px-8 py-4",
     },
     [headerBlock, content],
   );

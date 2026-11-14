@@ -121,7 +121,8 @@ jamais dans son ensemble.
 Mise en œuvre recommandée : conteneur racine en `display: grid`
 (ou `flex` colonne) avec `height: 100vh` et
 `grid-template-rows: auto 1fr auto`. Le corps utilise trois colonnes
-(`grid-template-columns: 13rem 1fr 1fr`).
+(`grid-template-columns: 13rem 1fr 24rem`) : le panneau d'étape prend la
+largeur restante, le plan global (mis à l'échelle par hauteur) reste étroit.
 
 ### Header
 

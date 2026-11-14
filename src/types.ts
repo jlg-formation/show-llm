@@ -101,9 +101,23 @@ export interface ImageDemo {
   grid: number;
   /** Patch mis en évidence (zoom sur ses pixels). */
   focusPatch: { row: number; col: number };
+  /** Longueur d'un vecteur en sortie de l'encodeur visuel (exemple). */
+  encoderDim: number;
+  /** Longueur d'un embedding du LLM, cible du projecteur (exemple). */
+  llmDim: number;
   /** Quelques pixels du patch mis en évidence. */
   pixels: { label: string; rgb: [number, number, number] }[];
   samples: ImagePatchSample[];
+}
+
+/** Dimensions réelles d'un LLM open weight. */
+export interface OpenModel {
+  name: string;
+  layers: number;
+  /** Longueur d'un embedding (dimension cachée du modèle). */
+  embeddingDim: number;
+  /** Taille du vocabulaire = longueur du vecteur de logits. */
+  vocabSize: number;
 }
 
 /** Paramètres du moteur d'inférence. */

@@ -66,7 +66,10 @@ Messages clés :
 - une image coûte **beaucoup de tokens** (centaines) ;
 - à partir du Transformer, le pipeline est **identique** au mode texte ;
 - l'image n'est traitée **qu'une seule fois** : la boucle d'inférence ne
-  la ré-encode pas.
+  la ré-encode pas ;
+- chaque fois qu'un vecteur apparaît, on donne sa **longueur réelle** sur
+  des modèles open weight (embeddings, logits, encodeurs visuels,
+  projecteurs) ; les valeurs affichées restent tronquées à 6 nombres.
 
 ## Valeurs de référence (grille de patches)
 
@@ -75,13 +78,14 @@ On s'aligne sur la littérature (Vision Transformer, ViT-B/16) :
 - image d'entrée : **224 × 224 pixels** ;
 - patch : **16 × 16 pixels** ;
 - grille : **14 × 14 patches**, soit **196 patches** ;
-- un patch contient 16 × 16 × 3 (RGB) = **768 valeurs** de pixels.
+- un patch contient 16 × 16 pixels × 3 couleurs (RGB) = **768 valeurs**.
 
-Dans la démo, la grille 14 × 14 est **réellement dessinée** sur l'image.
-Les vecteurs affichés restent symboliques (quelques dimensions). Une note
-indique que certains modèles utilisent des patches de 14 px (ex. : 336 px
-→ 24 × 24 = 576 patches), pour expliquer pourquoi on rencontre « 14 » ou
-« 16 » selon les sources.
+Dans la démo, la grille de 14 × 14 patches est **réellement dessinée** sur
+l'image. Les vecteurs affichés restent symboliques (quelques
+dimensions). Pour éviter toute confusion, la démo ne manipule qu'une
+seule taille de patch (16 × 16 pixels) ; une note indique seulement que
+dans la littérature on rencontre différentes tailles de patch (14 × 14,
+16 × 16, etc.).
 
 ## Scénario pédagogique
 
@@ -150,9 +154,10 @@ Le mode Texte conserve ses 13 stations actuelles.
    quelques-uns affichés).
 4. **Tokens image** : le projecteur aligne ces vecteurs sur l'espace du
    LLM. Insister visuellement : **pas d'identifiant `#id`**, contrairement
-   aux tokens texte. Montrer les marqueurs spéciaux délimitant l'image.
-5. **Séquence** : une seule ligne composée de [marqueur début] [tokens
-   image] [marqueur fin] [tokens texte]. Les deux origines sont distinguées
+   aux tokens texte. Montrer les meta tokens (tokens spéciaux) délimitant
+   l'image.
+5. **Séquence** : une seule ligne composée de [meta token début] [tokens
+   image] [meta token fin] [tokens texte]. Les deux origines sont distinguées
    par la couleur. Les 196 tokens image sont abrégés (quelques-uns + « … »
    - compteur).
 

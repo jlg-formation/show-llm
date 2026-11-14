@@ -37,7 +37,7 @@ export function createApp(): HTMLElement {
   const body = h(
     "main",
     {
-      class: "grid min-h-0 grid-cols-[13rem_1fr_1fr]",
+      class: "grid min-h-0 grid-cols-[13rem_1fr_24rem]",
     },
     [createTimeline(), createStepPanel(), createSchematicPanel()],
   );
