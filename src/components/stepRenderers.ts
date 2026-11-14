@@ -9,6 +9,7 @@ import {
   META_TOKENS_O200K,
   OPEN_MODELS,
   PROJECTORS,
+  SEQUENCE_VECTORS,
   VISION_ENCODERS,
 } from "../data";
 import { createCatImage, createPatchView } from "./catImage";
@@ -994,6 +995,11 @@ function patchLabel(row: number, col: number): string {
   return `patch (${row + 1}, ${col + 1})`;
 }
 
+/** Nom du token image issu d'un patch (numérotation ligne par ligne). */
+function imageTokenName(row: number, col: number): string {
+  return `img ${row * IMAGE_DEMO.grid + col + 1}`;
+}
+
 function renderPatches(): HTMLElement {
   const { size, patchSize, grid, focusPatch, pixels } = IMAGE_DEMO;
   const total = grid * grid;
@@ -1112,7 +1118,7 @@ function renderVisionEncoder(): HTMLElement {
 }
 
 function renderImageTokens(): HTMLElement {
-  const { samples, encoderDim, llmDim } = IMAGE_DEMO;
+  const { samples, encoderDim, llmDim, focusPatch } = IMAGE_DEMO;
   const rows = samples.slice(0, 3).map((s) =>
     h("div", { class: "anim-item flex items-center gap-3" }, [
       patchThumb(s.row, s.col),
@@ -1134,6 +1140,14 @@ function renderImageTokens(): HTMLElement {
           vectorView(s.projected, true),
         ]),
       ]),
+      h("span", { class: "text-[var(--color-muted)]" }, ["→"]),
+      h(
+        "span",
+        {
+          class: `rounded-lg border px-2 py-1 font-mono text-sm font-semibold ${IMAGE_CHIP}`,
+        },
+        [imageTokenName(s.row, s.col)],
+      ),
     ]),
   );
   const chip = (top: string, bottom: string, image: boolean) =>
@@ -1169,11 +1183,11 @@ function renderImageTokens(): HTMLElement {
           class: `anim-item mb-3 rounded-lg border px-3 py-2 text-sm font-semibold ${IMAGE_CHIP}`,
         },
         [
-          `« Chaque patch est projeté séparément : 1 vecteur de patch → 1 token image. Ici, ${IMAGE_DEMO.grid * IMAGE_DEMO.grid} patches → ${IMAGE_DEMO.grid * IMAGE_DEMO.grid} tokens image. »`,
+          `« Chaque patch est projeté séparément : 1 vecteur de patch → 1 token image (le patch n° N donne img N). Ici, ${IMAGE_DEMO.grid * IMAGE_DEMO.grid} patches → ${IMAGE_DEMO.grid * IMAGE_DEMO.grid} tokens image. »`,
         ],
       ),
       h("p", { class: "mb-3 text-xs text-[var(--color-muted)]" }, [
-        "Quelques patches d'exemple (6 premières valeurs de chaque vecteur) :",
+        "Les patches sont numérotés ligne par ligne. Trois exemples (6 premières valeurs de chaque vecteur) :",
       ]),
       h("div", { class: "flex flex-col gap-3" }, rows),
       h("p", { class: "anim-item mt-4 mb-2 text-sm font-semibold" }, [
@@ -1182,7 +1196,7 @@ function renderImageTokens(): HTMLElement {
       h("div", { class: "anim-item flex flex-wrap items-center gap-4" }, [
         chip(" chat", "#15821 (fictif)", false),
         chip(
-          patchLabel(samples[1].row, samples[1].col),
+          imageTokenName(focusPatch.row, focusPatch.col),
           "aucun identifiant",
           true,
         ),
@@ -1201,70 +1215,116 @@ function renderImageTokens(): HTMLElement {
   ]);
 }
 
+type RowTone = "image" | "text" | "meta";
+
+const ROW_TONE: Record<RowTone, string> = {
+  image: IMAGE_CHIP,
+  text: "border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-ink)]",
+  meta: "border-slate-400 bg-slate-200 text-slate-700",
+};
+
+/** Une ligne de la matrice d'entrée : origine, identifiant de token et vecteur d'embedding. */
+function matrixRow(
+  label: string,
+  id: string,
+  values: number[],
+  tone: RowTone,
+): HTMLElement {
+  return h("div", { class: "anim-item flex items-center gap-2" }, [
+    h(
+      "span",
+      {
+        class: `w-24 shrink-0 truncate rounded border px-2 py-0.5 text-center font-mono text-xs font-semibold ${ROW_TONE[tone]}`,
+      },
+      [label],
+    ),
+    h(
+      "span",
+      {
+        class:
+          "w-16 shrink-0 text-right font-mono text-[11px] text-[var(--color-muted)]",
+      },
+      [id],
+    ),
+    h("span", { class: "w-3 text-[var(--color-muted)]" }, ["→"]),
+    vectorView(values, tone === "image"),
+  ]);
+}
+
 function renderSequence(state: AppState): HTMLElement {
-  const { grid, llmDim } = IMAGE_DEMO;
+  const { grid, llmDim, samples } = IMAGE_DEMO;
   const imageCount = grid * grid;
   const total = imageCount + 2 + state.tokens.length;
-  const marker = (text: string) =>
-    h(
-      "div",
-      {
-        class:
-          "anim-item rounded-lg border border-slate-400 bg-slate-200 px-2 py-1 font-mono text-sm text-slate-700",
-      },
-      [text],
-    );
-  const imageChip = (text: string) =>
-    h(
-      "div",
-      {
-        class: `anim-item rounded-lg border px-2 py-1 font-mono text-sm ${IMAGE_CHIP}`,
-      },
-      [text],
-    );
-  const textChips = state.tokens.map((t) =>
-    h(
-      "div",
-      {
-        class:
-          "anim-item flex flex-col items-center rounded-lg border border-[var(--color-accent)] bg-[var(--color-accent-soft)] px-2 py-1",
-      },
-      [
-        h("span", { class: "font-mono text-sm font-semibold" }, [
-          t.text.trim() === "" ? "␣" : t.text,
-        ]),
-        h("span", { class: "text-[10px] text-[var(--color-muted)]" }, [
-          `#${t.id}`,
-        ]),
-      ],
+  const textRows = state.tokens.map((t, i) =>
+    matrixRow(
+      t.text.trim() || "␣",
+      `#${t.id}`,
+      state.embeddings[i]?.values ?? [],
+      "text",
     ),
   );
+  // Deux premières et deux dernières lignes du texte, le reste est omis.
+  const shownText = [...textRows.slice(0, 2), ...textRows.slice(-2)];
+  const omittedRow = (count: number, label: string, cls: string) =>
+    h("div", { class: `anim-item flex items-center gap-2 text-xs ${cls}` }, [
+      h("span", { class: "w-24 shrink-0 text-center text-lg" }, ["⋮"]),
+      h("span", {}, [`${count} lignes ${label} omises`]),
+    ]);
+  const colTitle = (text: string, cls: string) =>
+    h("span", { class: cls }, [text]);
   return wrap([
     card([
-      h("p", { class: "mb-3 text-sm text-[var(--color-muted)]" }, [
-        "Les tokens image sont encadrés par deux meta tokens (voir l'étape Tokenisation ; leur nom varie selon le modèle), suivis des tokens du texte : une seule séquence entre dans le Transformer.",
+      h("p", { class: "mb-2 text-sm font-semibold text-[var(--color-ink)]" }, [
+        "Ce qui entre dans le LLM n'est ni du texte, ni des identifiants, ni des pixels : c'est une matrice de vecteurs d'embedding, une ligne par élément de la séquence.",
       ]),
-      h("div", { class: "flex flex-wrap items-center gap-2" }, [
-        marker("<img>"),
-        imageChip("img 1"),
-        imageChip("img 2"),
-        imageChip("img 3"),
-        imageChip(`⋯ ${imageCount} au total`),
-        marker("</img>"),
-        ...textChips,
+      h("p", { class: "mb-3 text-xs text-[var(--color-muted)]" }, [
+        "L'étiquette et l'identifiant ne servent qu'à retrouver l'origine d'une ligne. Texte : vecteur lu dans la table d'embeddings via l'identifiant. Image : vecteur produit par le projecteur.",
       ]),
-      h("p", { class: "anim-item mt-4 text-sm font-semibold" }, [
-        `${imageCount} tokens image + 2 meta tokens + ${state.tokens.length} tokens texte = ${total} tokens`,
+      h(
+        "div",
+        {
+          class:
+            "mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-muted)]",
+        },
+        [
+          colTitle("Origine", "w-24 shrink-0 text-center"),
+          colTitle("Id (fictif)", "w-16 shrink-0 text-right"),
+          colTitle("", "w-3"),
+          colTitle(`Vecteur d'embedding (${fmt(llmDim)} nombres)`, ""),
+        ],
+      ),
+      h(
+        "div",
+        {
+          class:
+            "flex flex-col gap-1 rounded-lg border-x-4 border-slate-400 px-3 py-2",
+        },
+        [
+          matrixRow("<img>", "#100001", SEQUENCE_VECTORS.imgStart, "meta"),
+          matrixRow("img 1", "—", samples[0].projected, "image"),
+          matrixRow("img 2", "—", samples[1].projected, "image"),
+          omittedRow(imageCount - 3, "image", "text-[var(--color-image)]"),
+          matrixRow(
+            `img ${imageCount}`,
+            "—",
+            SEQUENCE_VECTORS.lastImage,
+            "image",
+          ),
+          matrixRow("</img>", "#100002", SEQUENCE_VECTORS.imgEnd, "meta"),
+          ...shownText.slice(0, 2),
+          omittedRow(
+            state.tokens.length - 4,
+            "texte",
+            "text-[var(--color-accent)]",
+          ),
+          ...shownText.slice(2),
+        ],
+      ),
+      h("p", { class: "anim-item mt-3 text-sm font-semibold" }, [
+        `Matrice de ${total} lignes × ${fmt(llmDim)} colonnes = ${fmt(total * llmDim)} nombres (${imageCount} lignes pour l'image, ${state.tokens.length} pour la question).`,
       ]),
       h("p", { class: "anim-item mt-1 text-xs text-[var(--color-muted)]" }, [
-        "Identifiants des tokens texte fictifs.",
-      ]),
-      h("p", { class: "anim-item mt-2 text-sm" }, [
-        `Chaque token est un vecteur de ${fmt(llmDim)} nombres : la séquence représente ${total} × ${fmt(llmDim)} = ${fmt(total * llmDim)} nombres.`,
-      ]),
-      h("p", { class: "anim-item mt-2 text-xs text-[var(--color-muted)]" }, [
-        "Une image consomme beaucoup de contexte : ici ",
-        `${imageCount} tokens contre ${state.tokens.length} pour toute la question.`,
+        "À cette étape, un même token texte donne toujours le même vecteur (dans la question, « dort » et « le » reviennent deux fois, avec les mêmes valeurs).",
       ]),
     ]),
   ]);

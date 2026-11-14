@@ -156,10 +156,15 @@ Le mode Texte conserve ses 13 stations actuelles.
    LLM. Insister visuellement : **pas d'identifiant `#id`**, contrairement
    aux tokens texte. Montrer les meta tokens (tokens spéciaux) délimitant
    l'image.
-5. **Séquence** : une seule ligne composée de [meta token début] [tokens
-   image] [meta token fin] [tokens texte]. Les deux origines sont distinguées
-   par la couleur. Les 196 tokens image sont abrégés (quelques-uns + « … »
-   - compteur).
+5. **Séquence** : une **matrice de vecteurs d'embedding**, une ligne par
+   élément ([meta token début], tokens image, [meta token fin], tokens
+   texte). Chaque ligne affiche son origine (`img N`, ou le texte du token),
+   l'identifiant de token (fictif, absent pour l'image) et un vecteur tronqué
+   à 6 valeurs avec la longueur réelle. Message clé : le LLM ne reçoit que
+   cette matrice (ex. 208 lignes × 4 096 colonnes), ni texte ni
+   identifiants. Les lignes image sont abrégées (`img 1`, `img 2`, « ⋮ »,
+   `img 196`) ; les lignes texte aussi (deux premières, « ⋮ », deux
+   dernières) pour que l'étape tienne à l'écran sans défilement.
 
 ## Barre d'étapes latérale (timeline verticale)
 

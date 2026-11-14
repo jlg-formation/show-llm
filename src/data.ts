@@ -125,16 +125,16 @@ export const IMAGE_DEMO: ImageDemo = {
       projected: [0.33, -0.12, 0.61, 0.09, -0.4, 0.25],
     },
     {
+      row: 0,
+      col: 1,
+      encoded: [-0.18, 0.52, 0.11, -0.44, 0.09, 0.33],
+      projected: [0.29, -0.15, 0.58, 0.12, -0.37, 0.22],
+    },
+    {
       row: 8,
       col: 9,
       encoded: [0.64, -0.32, 0.19, 0.71, -0.58, 0.07],
       projected: [0.52, 0.41, -0.27, 0.15, 0.66, -0.3],
-    },
-    {
-      row: 9,
-      col: 4,
-      encoded: [0.58, 0.12, -0.44, 0.36, -0.09, 0.52],
-      projected: [-0.18, 0.47, 0.35, -0.62, 0.21, 0.14],
     },
     {
       row: 10,
@@ -160,6 +160,13 @@ export const OPEN_MODELS: OpenModel[] = [
     vocabSize: 129280
   }
 ];
+
+/** Vecteurs symboliques (6 valeurs) des lignes de la matrice d'entrée, hors tokens texte. */
+export const SEQUENCE_VECTORS = {
+  imgStart: [0.03, -0.71, 0.45, 0.22, -0.18, 0.6],
+  imgEnd: [-0.06, 0.68, -0.41, 0.19, 0.24, -0.57],
+  lastImage: [0.37, 0.1, -0.52, 0.48, -0.03, 0.21],
+};
 
 /** Meta tokens (tokens spéciaux) : [nom, identifiant ou usage]. */
 export const META_TOKENS_O200K: string[][] = [
